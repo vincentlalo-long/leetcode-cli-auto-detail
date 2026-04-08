@@ -1,0 +1,11 @@
+{
+  "base_dir": "D:/leetcode",
+  "data_structures": {
+    "array": "array",
+    "string": "string",
+    "linked_list": "linked_list",
+    "stack": "stack",
+    "graph": "graph",
+    "queue": "queue"
+  }
+}
