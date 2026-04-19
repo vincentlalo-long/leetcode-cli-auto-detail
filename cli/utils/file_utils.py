@@ -1,4 +1,5 @@
-import os
+﻿import os
+import re
 from typing import List
 
 def get_all_cpp_files(base_dir: str) -> List[str]:
@@ -17,5 +18,8 @@ def create_problem_directory(base_dir: str, ds_folder: str, problem_num: str) ->
     return problem_dir
 
 def count_solutions(content: str) -> int:
-    """Count number of solutions in file content"""
-    return content.count("Solution")
+    \"\"\"Count number of solutions in file content\"\"\"
+    # Match pattern starting with /// (optionally followed by =) or at least three =
+    pattern = r'///\s*={0,}\s*Solution\s+\d+|={3,}\s*Solution\s+\d+'
+    matches = re.findall(pattern, content, re.IGNORECASE)
+    return len(matches)
