@@ -5,6 +5,7 @@ import sys
 from cli.commands import add_problem
 from cli.commands import add_solution
 from cli.commands import manage_structures
+from cli.commands import list_problems
 from cli.utils.config_manager import ConfigManager
 from cli.utils.ui import (
     print_banner, print_small_banner, print_info, print_error, 
@@ -18,7 +19,7 @@ def load_config():
 def show_help():
     """Show help with beautiful formatting"""
     print_banner()
-    console.print("[bold yellow]Usage: leet <command> [options][/bold yellow]\n")
+    console.print("[bold yellow]Hey! Use 'leet <command>' to get started[/bold yellow]\n")
 
     console.print("[bold white]Available Commands:[/bold white]\n")
     
@@ -26,6 +27,7 @@ def show_help():
         ("add", "Create a new problem"),
         ("add-sol", "Add a solution to a problem"),
         ("manage-structures", "Manage data structures"),
+        ("list", "List all problems"),
         ("help", "Show this help message"),
     ]
     
@@ -52,16 +54,8 @@ def main():
     elif cmd == "manage-structures":
         print()
         manage_structures.main(config)
+    elif cmd == "list":
+        print()
+        list_problems.main(config)
     elif cmd == "help":
-        show_help()
-    else:
-        print()
-        print_error(f"Unknown command: '{cmd}'")
-        print()
-        show_help()
-
-if __name__ == "__main__":
-    main()
-
-if __name__ == "__main__":
-    main()
+        show
