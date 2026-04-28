@@ -6,12 +6,12 @@ from typing import Any, Dict, List
 from cli.utils.file_utils import get_all_cpp_files
 from cli.utils.ui import (
     console,
-    print_command_banner,
+    print_header,
     print_error,
     print_info,
     print_list_item,
     separator,
-    styled_prompt,
+    styled_text_input,
 )
 
 
@@ -112,7 +112,7 @@ def display_results(results: List[Dict[str, Any]]) -> None:
 
 def main(config: Dict[str, Any]) -> None:
     """Main function for search command"""
-    print_command_banner("🔍 Search Problems")
+    print_header("🔍 Search Problems")
 
     base_dir = config.get("base_dir", ".")
     data_structures = config.get("data_structures", {})
@@ -123,7 +123,7 @@ def main(config: Dict[str, Any]) -> None:
         return
 
     # Get search query from user
-    query = styled_prompt("Enter problem name or number to search")
+    query = styled_text_input("Enter problem name or number to search")
 
     if not query.strip():
         print_error("Search query cannot be empty.")
