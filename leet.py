@@ -6,6 +6,7 @@ from cli.commands import add_problem
 from cli.commands import add_solution
 from cli.commands import list_problems
 from cli.commands import manage_structures
+from cli.commands import search_problems
 from cli.commands import stats
 from cli.utils.config_manager import ConfigManager
 from cli.utils.ui import (
@@ -28,6 +29,7 @@ def show_help():
         ("add", "Create a new problem"),
         ("add-sol", "Add a solution to a problem"),
         ("list", "List and filter problems"),
+        ("search", "Search problems by name or number"),
         ("manage-structures", "Manage data structures"),
         ("stats", "Show problem statistics"),
         ("help", "Show this help message"),
@@ -56,6 +58,9 @@ def main():
     elif cmd == "list":
         print()
         list_problems.main(config)
+    elif cmd == "search":
+        print()
+        search_problems.main(config)
     elif cmd == "manage-structures":
         print()
         manage_structures.main(config)
