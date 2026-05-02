@@ -8,7 +8,10 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.syntax import Syntax
 from rich.text import Text
+from rich.columns import Columns
+from rich.align import Align
 from typing import List, Optional
+import os
 
 console = Console()
 DIVIDER_WIDTH = 56
@@ -139,6 +142,78 @@ def print_menu_footer():
     """Print a menu footer"""
     separator()
     console.print()
+
+
+def render_header():
+    """Renders the stylized 'IDEAL' logo with ASCII art and gradient colors."""
+    # Define the ASCII art for IDEAL (5 letters only) with color codes
+    lines = [
+        " [bold blue]██╗[/bold blue]  [bold magenta]██████╗ [/bold magenta] [bold magenta]███████╗ [/bold magenta] [bold magenta]█████╗ [/bold magenta]  [bold magenta]██╗ [/bold magenta]",
+        " [bold blue]██║[/bold blue]  [bold magenta]██╔══██╗[/bold magenta] [bold magenta]██╔════╝ [/bold magenta] [bold magenta]██╔══██╗[/bold magenta] [bold magenta]██║ [/bold magenta]",
+        " [bold blue]██║[/bold blue]  [bold magenta]██║  ██║[/bold magenta] [bold magenta]█████╗   [/bold magenta] [bold magenta]███████║[/bold magenta] [bold magenta]██║ [/bold magenta]",
+        " [bold blue]██║[/bold blue]  [bold magenta]██║  ██║[/bold magenta] [bold magenta]██╔══╝   [/bold magenta] [bold magenta]██╔══██║[/bold magenta] [bold magenta]██║ [/bold magenta]",
+        " [bold cyan]██║[/bold cyan]  [bold cyan]██████╔╝[/bold cyan] [bold magenta]███████╗ [/bold magenta] [bold magenta]██║  ██║[/bold magenta] [bold magenta]███████╗[/bold magenta]",
+        " [bold cyan]╚═╝[/bold cyan]  [bold cyan]╚═════╝ [/bold cyan] [bold magenta]╚══════╝ [/bold magenta] [bold magenta]╚═╝  ╚═╝[/bold magenta] [bold magenta]╚══════╝[/bold magenta]",
+    ]
+    for line in lines:
+        console.print(line)
+    console.print()
+
+
+def render_info_section():
+    """Renders the helpful tips box."""
+    tips_text = (
+        "[white]Tips for getting started:[/white]\n"
+        "[white]1. Ask questions, edit files, or run commands.[/white]\n"
+        "[white]2. Be specific for the best results.[/white]\n"
+        "[white]3. [bold magenta]/help[/bold magenta] for more information.[/white]"
+    )
+    console.print(tips_text + "\n")
+
+
+def render_status_bar(mode="no sandbox", active_model="IDEAL-core (100%)"):
+    """Renders the three-column status bar below the input."""
+    # Get short path representation (e.g. ~/project)
+    home = os.path.expanduser("~")
+    cwd = os.getcwd().replace(home, "~")
+    
+    # Left, Center, Right aligned elements
+    left = Text(cwd, style="bold cyan")
+    center = Text(mode, style="red")
+    right = Text(active_model, style="magenta")
+    
+    # Use Columns to auto-space items across the terminal width
+    columns = Columns([
+        Align(left, align="left"),
+        Align(center, align="center"),
+        Align(right, align="right")
+    ], expand=True)
+    
+    # Draw separation line and columns
+    console.print("[dim]" + "─" * console.width + "[/dim]")
+    console.print(columns)
+    console.print()
+
+
+def get_styled_input() -> str:
+    """Renders the input prompt with integrated footer."""
+    # Top divider
+    console.print("[dim]" + "─" * console.width + "[/dim]")
+    
+    # Styled input request
+    cmd = console.input("[bold cyan]>[/bold cyan] ")
+    
+    # Bottom footer integrated with input box
+    footer_text = (
+        "[dim]Ctrl+C to exit[/dim] • "
+        "[dim]/help for commands[/dim] • "
+        "[dim]Type a command to start[/dim]"
+    )
+    console.print("[dim]" + "─" * console.width + "[/dim]")
+    console.print(Align(footer_text, align="center"))
+    console.print()
+    
+    return cmd
 
 
 def print_banner():
