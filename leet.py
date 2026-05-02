@@ -22,6 +22,7 @@ def load_config():
 def show_help():
     """Show help with beautiful formatting"""
     console.print()
+    console.print("[bold yellow]Usage: leet <command> [options][/bold yellow]\n")
     console.print("[bold white]Available Commands:[/bold white]\n")
     
     commands = [
@@ -95,7 +96,13 @@ def main():
         handle_command(config, " ".join(sys.argv[1:]))
         return
 
-    # Interactive UI Loop
+    # Check if stdin is interactive (terminal) or piped/test
+    if not sys.stdin.isatty():
+        # Non-interactive environment (tests, pipes, etc.) - show help and exit
+        show_help()
+        return
+
+    # Interactive UI Loop (only in terminal)
     render_header()
     render_info_section()
 
