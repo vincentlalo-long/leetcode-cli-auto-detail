@@ -18,6 +18,8 @@ from cli.commands import theme
 from cli.commands import profile
 from cli.commands import contest
 from cli.commands import similar
+from cli.commands import submit_problem
+from cli.commands import test_problem
 from cli.utils.config_manager import ConfigManager
 from cli.utils.ui import (
     print_banner, print_small_banner, print_info, print_error, 
@@ -43,6 +45,8 @@ COMMANDS = [
     ("similar", "Find similar problems"),
     ("open", "Open problem description and code editor"),
     ("run", "Compile or run code locally"),
+    ("test", "Run LeetCode testcases for a solution"),
+    ("submit", "Submit solution to LeetCode and show benchmark"),
     ("sync", "Sync LeetCode workspace with Git"),
     ("profile", "View LeetCode user profile stats"),
     ("contest", "View upcoming LeetCode contests"),
@@ -126,6 +130,14 @@ def handle_command(config, cmd_string):
         print()
         sys.argv = parts
         run_problem.main(config)
+    elif cmd == "test":
+        print()
+        sys.argv = parts
+        test_problem.main(config)
+    elif cmd == "submit":
+        print()
+        sys.argv = parts
+        submit_problem.main(config)
     elif cmd == "sync":
         print()
         sys.argv = parts
