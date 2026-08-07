@@ -1,0 +1,32 @@
+{
+  "base_dir": "D:",
+  "languages": {
+    "c": {
+      "label": "C",
+      "ext": "c"
+    },
+    "cpp": {
+      "label": "C++",
+      "ext": "cpp"
+    },
+    "go": {
+      "label": "Go",
+      "ext": "go"
+    },
+    "python": {
+      "label": "Python",
+      "ext": "py"
+    }
+  },
+  "default_language": "cpp",
+  "data_structures": {
+    "array": "array",
+    "graph": "graph",
+    "linkedlist": "linked_list",
+    "queue": "queue",
+    "stack": "stack",
+    "string": "string"
+  },
+  "theme": "default",
+  "editor": "nano"
+}

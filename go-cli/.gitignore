@@ -1,0 +1,8 @@
+# Build artifacts
+*.exe
+*.exe~
+!leetcli/**/*.exe
+
+# Compiled solution binaries
+**/1_Two Sum
+**/*_Two Sum
