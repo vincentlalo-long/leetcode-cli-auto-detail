@@ -1,0 +1,161 @@
+package commands
+
+import (
+	"os"
+	"path/filepath"
+	"time"
+
+	"leetcli/internal/api"
+	"leetcli/internal/config"
+	"leetcli/internal/template"
+)
+
+func SubmitProblem(args []string, cfg *config.Config, ui UI) {
+	ui.WriteOutput(MsgPlain, "--- LeetCode Submit ---\n")
+
+	problemNum := ui.PromptText("Enter problem number to submit")
+	if problemNum == "" {
+		return
+	}
+
+	baseDir := cfg.BaseDir
+	if baseDir == "" {
+		ui.WriteOutput(MsgError, "Invalid base directory in config")
+		return
+	}
+
+	ui.WriteOutput(MsgInfo, "Searching for problem...")
+	languages := template.NormalizeLanguages(nil)
+	for k, v := range cfg.Languages {
+		languages[k] = template.LanguageInfo{Label: v.Label, Ext: v.Ext}
+	}
+	var exts []string
+	for _, info := range languages {
+		exts = append(exts, info.Ext)
+	}
+
+	allFiles := template.GetAllSolutionFiles(baseDir, exts)
+	var matches []string
+	for _, f := range allFiles {
+		base := filepath.Base(f)
+		if template.MatchesProblemNumber(base, problemNum) {
+			matches = append(matches, f)
+		}
+	}
+
+	if len(matches) == 0 {
+		ui.WriteOutput(MsgError, "Could not find local file for problem %s.", problemNum)
+		return
+	}
+
+	targetFile := matches[0]
+	if len(matches) > 1 {
+		names := make([]string, len(matches))
+		for i, f := range matches {
+			names[i] = filepath.Base(f)
+		}
+		selected := ui.PromptSelect("Multiple matches. Select file to submit", names)
+		for i, n := range names {
+			if n == selected {
+				targetFile = matches[i]
+				break
+			}
+		}
+	}
+
+	contentBytes, err := os.ReadFile(targetFile)
+	if err != nil {
+		ui.WriteOutput(MsgError, "Failed to read file: %v", err)
+		return
+	}
+	content := string(contentBytes)
+
+	ext := filepath.Ext(targetFile)
+	langKey := template.GetLanguageByExtension(languages, ext)
+	if langKey == "" {
+		ui.WriteOutput(MsgError, "Unsupported file extension for submission.")
+		return
+	}
+
+	lcLang, ok := template.LeetCodeLangMap[langKey]
+	if !ok {
+		ui.WriteOutput(MsgError, "Language '%s' is not supported by LeetCode API.", langKey)
+		return
+	}
+
+	slug := template.InferSlugFromPath(targetFile, content)
+	if slug == "" {
+		slug = ui.PromptText("Enter LeetCode problem slug (e.g., two-sum)")
+		if slug == "" {
+			return
+		}
+	}
+
+	details, err := api.GetProblemDetails(slug)
+	if err != nil {
+		ui.WriteOutput(MsgError, "Could not fetch problem details from LeetCode: %v", err)
+		return
+	}
+
+	if cfg.LeetcodeSession == "" || cfg.LeetcodeCsrf == "" {
+		ui.WriteOutput(MsgError, "LeetCode submit requires leetcode_session and leetcode_csrf in config.")
+		ui.WriteOutput(MsgInfo, "Please set these values in your config.json.")
+		return
+	}
+
+	ui.WriteOutput(MsgInfo, "Submitting %s solution to LeetCode (slug: %s)...", lcLang, slug)
+	subID, err := api.SubmitSolution(cfg.LeetcodeSession, cfg.LeetcodeCsrf, slug, details.QuestionID, lcLang, content)
+	if err != nil {
+		ui.WriteOutput(MsgError, "Submission failed: %v", err)
+		return
+	}
+
+	ui.WriteOutput(MsgInfo, "Submission ID: %s. Polling for results...", subID)
+	for i := 0; i < 15; i++ {
+		time.Sleep(2 * time.Second)
+		res, err := api.CheckSubmissionStatus(cfg.LeetcodeSession, cfg.LeetcodeCsrf, subID)
+		if err != nil {
+			ui.WriteOutput(MsgError, "Error checking status: %v", err)
+			continue
+		}
+		if res.State == "PENDING" || res.State == "STARTED" {
+			ui.WriteOutput(MsgInfo, "Status: %s...", res.State)
+			continue
+		}
+
+		if res.StatusMsg == "Accepted" {
+			ui.WriteOutput(MsgSuccess, "✔ ACCEPTED!")
+			if res.StatusRuntime != "" {
+				ui.WriteOutput(MsgPlain, "  Runtime: %s (Beats %.2f%%)", res.StatusRuntime, res.RuntimePercentile)
+			}
+			if res.StatusMemory != "" {
+				ui.WriteOutput(MsgPlain, "  Memory:  %s (Beats %.2f%%)", res.StatusMemory, res.MemoryPercentile)
+			}
+			if res.TotalTestcases > 0 {
+				ui.WriteOutput(MsgPlain, "  Testcases: %d / %d", res.TotalCorrect, res.TotalTestcases)
+			}
+		} else {
+			ui.WriteOutput(MsgError, "✘ Result: %s", res.StatusMsg)
+			if res.TotalTestcases > 0 {
+				ui.WriteOutput(MsgPlain, "  Passed: %d / %d testcases", res.TotalCorrect, res.TotalTestcases)
+			}
+			if res.CompileError != "" || res.FullCompileError != "" {
+				errMsg := res.CompileError
+				if errMsg == "" {
+					errMsg = res.FullCompileError
+				}
+				ui.WriteOutput(MsgError, "Compile Error:\n%s", errMsg)
+			}
+			if res.RuntimeError != "" || res.FullRuntimeError != "" {
+				errMsg := res.RuntimeError
+				if errMsg == "" {
+					errMsg = res.FullRuntimeError
+				}
+				ui.WriteOutput(MsgError, "Runtime Error:\n%s", errMsg)
+			}
+		}
+		return
+	}
+
+	ui.WriteOutput(MsgError, "Timed out waiting for submission result.")
+}
