@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"leetcli/internal/config"
+	"leetcli/internal/template"
 )
 
 func Sync(args []string, cfg *config.Config, ui UI) {
@@ -35,6 +36,13 @@ func Sync(args []string, cfg *config.Config, ui UI) {
 	}
 
 	ui.WriteOutput(MsgInfo, "Syncing workspace: %s", baseDir)
+
+	ui.WriteOutput(MsgInfo, "Updating root README.md index...")
+	if _, count, err := template.GenerateRootReadme(baseDir, cfg); err == nil {
+		ui.WriteOutput(MsgSuccess, "Updated README.md index with %d problem(s).", count)
+	} else {
+		ui.WriteOutput(MsgError, "Warning: Failed to update root README.md: %v", err)
+	}
 
 	ui.WriteOutput(MsgInfo, "Staging changes...")
 	if out, err := runGit(baseDir, "add", "."); err != nil {

@@ -177,6 +177,13 @@ var CommandDocs = map[string]CommandDoc{
 		Description: "Scans workspace recursively and removes temporary build files generated during local execution (leet_run_*, .class, .tmp) to keep repository clean.",
 		Examples:    []string{"clean"},
 	},
+	"readme": {
+		Name:        "readme",
+		Summary:     "Generate or update workspace root README.md index table",
+		Usage:       "readme",
+		Description: "Scans workspace problem folders and automatically builds a clickable Markdown index table with problem statistics and relative links to solution files and problem READMEs.",
+		Examples:    []string{"readme", "build-readme"},
+	},
 	"clear": {
 		Name:        "clear",
 		Summary:     "Clear TUI terminal output",

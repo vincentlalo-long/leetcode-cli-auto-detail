@@ -57,3 +57,11 @@ func TestStripHTMLTags(t *testing.T) {
 		t.Errorf("StripHTMLTags() = %q, want %q", got, expected)
 	}
 }
+
+func TestGenerateRootReadme(t *testing.T) {
+	readmePath, count, err := GenerateRootReadme("D:/template-custom-leetcode", nil)
+	if err != nil {
+		t.Fatalf("GenerateRootReadme failed: %v", err)
+	}
+	t.Logf("Generated README at %s with %d problems", readmePath, count)
+}
