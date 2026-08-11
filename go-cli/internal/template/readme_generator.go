@@ -25,19 +25,6 @@ type ProblemEntry struct {
 	SolutionRels []string
 }
 
-var ignoredDirs = map[string]bool{
-	".git":           true,
-	".github":        true,
-	"go-cli":         true,
-	"python_version": true,
-	"extension":      true,
-	"node_modules":   true,
-	"scratch":        true,
-	".vscode":        true,
-	".idea":          true,
-	"bin":            true,
-}
-
 // GenerateRootReadme scans baseDir for all problem directories, extracts metadata,
 // generates a dynamic index markdown, and writes it to baseDir/README.md.
 func GenerateRootReadme(baseDir string, cfg *config.Config) (string, int, error) {
@@ -69,8 +56,7 @@ func GenerateRootReadme(baseDir string, cfg *config.Config) (string, int, error)
 			return nil
 		}
 		if info.IsDir() {
-			dirName := strings.ToLower(info.Name())
-			if ignoredDirs[dirName] {
+			if path != absBase && IsIgnoredDir(info.Name()) {
 				return filepath.SkipDir
 			}
 			return nil

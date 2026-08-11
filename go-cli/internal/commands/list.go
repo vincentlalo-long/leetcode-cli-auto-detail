@@ -17,10 +17,13 @@ type ProblemRecord struct {
 	FileName   string
 	Structure  string
 	Solutions  int
+	Difficulty string
 }
 
 func ListProblems(args []string, cfg *config.Config, ui UI) {
 	ui.WriteOutput(MsgPlain, "--- List Problems ---\n")
+
+	pos, flags := parseFlags(args)
 
 	baseDir := cfg.BaseDir
 	dataStructures := cfg.GetDataStructures()
@@ -49,27 +52,69 @@ func ListProblems(args []string, cfg *config.Config, ui UI) {
 		return
 	}
 
-	structSet := make(map[string]bool)
-	for _, r := range records {
-		structSet[r.Structure] = true
+	// Non-interactive flags: leet list --ds array --difficulty Easy --unsolved
+	filterFlagged := false
+	selectedStructure := ""
+	difficulty := ""
+	unsolvedOnly := false
+	if hasFlag(flags, "ds") {
+		filterFlagged = true
+		selectedStructure = flags["ds"]
 	}
-	availableStructs := make([]string, 0, len(structSet))
-	for s := range structSet {
-		availableStructs = append(availableStructs, s)
+	if strings.EqualFold(selectedStructure, "all") {
+		selectedStructure = ""
 	}
-	sort.Strings(availableStructs)
+	if hasFlag(flags, "difficulty") || hasFlag(flags, "diff") {
+		filterFlagged = true
+		d := flags["difficulty"]
+		if d == "" {
+			d = flags["diff"]
+		}
+		difficulty = strings.Title(strings.ToLower(d))
+	}
+	if hasFlag(flags, "unsolved") || hasFlag(flags, "u") {
+		filterFlagged = true
+		unsolvedOnly = true
+	}
 
-	filterChoices := append([]string{"All"}, availableStructs...)
-	selectedStructure := ui.PromptSelect("Filter by data structure", filterChoices)
-	unsolvedOnly := ui.PromptConfirm("Show only unsolved problems?")
+	if !filterFlagged && len(pos) == 0 {
+		structSet := make(map[string]bool)
+		for _, r := range records {
+			structSet[r.Structure] = true
+		}
+		availableStructs := make([]string, 0, len(structSet))
+		for s := range structSet {
+			availableStructs = append(availableStructs, s)
+		}
+		sort.Strings(availableStructs)
 
-	filtered := filterProblems(records, selectedStructure, unsolvedOnly)
+		filterChoices := append([]string{"All"}, availableStructs...)
+		selectedStructure = ui.PromptSelect("Filter by data structure", filterChoices)
+		unsolvedOnly = ui.PromptConfirm("Show only unsolved problems?")
+	}
+
+	if !filterFlagged && len(pos) > 0 && pos[0] != "all" && pos[0] != "" {
+		if isDifficulty(pos[0]) {
+			difficulty = strings.Title(strings.ToLower(pos[0]))
+		} else {
+			selectedStructure = pos[0]
+		}
+	}
+
+	if selectedStructure == "All" {
+		selectedStructure = ""
+	}
+
+	filtered := filterProblems(records, selectedStructure, difficulty, unsolvedOnly)
 
 	ui.WriteOutput(MsgPlain, "Overview")
 	ui.WriteOutput(MsgInfo, "Total problems: %d", len(records))
 	ui.WriteOutput(MsgInfo, "After filters: %d", len(filtered))
-	if selectedStructure != "All" {
+	if selectedStructure != "" {
 		ui.WriteOutput(MsgInfo, "Structure: %s", selectedStructure)
+	}
+	if difficulty != "" {
+		ui.WriteOutput(MsgInfo, "Difficulty: %s", difficulty)
 	}
 	if unsolvedOnly {
 		ui.WriteOutput(MsgInfo, "Mode: Unsolved only")
@@ -88,9 +133,21 @@ func ListProblems(args []string, cfg *config.Config, ui UI) {
 		if r.Solutions > 0 {
 			status = fmt.Sprintf("%d solution(s)", r.Solutions)
 		}
-		ui.WriteOutput(MsgPlain, "  %d. %s (%s, %s)", i+1, r.FileName, r.Structure, status)
+		diff := r.Difficulty
+		if diff == "" {
+			diff = "?"
+		}
+		ui.WriteOutput(MsgPlain, "  %d. %s (%s, %s, %s)", i+1, r.FileName, r.Structure, diff, status)
 		ui.WriteOutput(MsgPlain, "     %s", r.FilePath)
 	}
+}
+
+func isDifficulty(s string) bool {
+	switch strings.ToLower(strings.TrimSpace(s)) {
+	case "easy", "medium", "hard":
+		return true
+	}
+	return false
 }
 
 func collectProblems(baseDir string, dataStructures map[string]string, exts []string) []ProblemRecord {
@@ -99,15 +156,17 @@ func collectProblems(baseDir string, dataStructures map[string]string, exts []st
 
 	for _, f := range files {
 		solutions := 0
-		if content, err := os.ReadFile(f); err == nil {
+		content, err := os.ReadFile(f)
+		if err == nil {
 			solutions = template.CountSolutions(string(content))
 		}
 
 		records = append(records, ProblemRecord{
-			FilePath:  f,
-			FileName:  filepath.Base(f),
-			Structure: template.DetectStructure(f, dataStructures),
-			Solutions: solutions,
+			FilePath:   f,
+			FileName:   filepath.Base(f),
+			Structure:  template.DetectStructure(f, dataStructures),
+			Solutions:  solutions,
+			Difficulty: readDifficultyFromReadme(filepath.Dir(f)),
 		})
 	}
 
@@ -132,10 +191,26 @@ func collectProblems(baseDir string, dataStructures map[string]string, exts []st
 	return records
 }
 
-func filterProblems(records []ProblemRecord, selectedStructure string, unsolvedOnly bool) []ProblemRecord {
+func readDifficultyFromReadme(dir string) string {
+	data, err := os.ReadFile(filepath.Join(dir, "README.md"))
+	if err != nil {
+		return ""
+	}
+	re := regexp.MustCompile(`(?i)-\s*\*\*Difficulty:\*\*\s*(.+)`)
+	m := re.FindStringSubmatch(string(data))
+	if len(m) >= 2 {
+		return strings.TrimSpace(m[1])
+	}
+	return ""
+}
+
+func filterProblems(records []ProblemRecord, selectedStructure, difficulty string, unsolvedOnly bool) []ProblemRecord {
 	var filtered []ProblemRecord
 	for _, r := range records {
-		if selectedStructure != "All" && r.Structure != selectedStructure {
+		if selectedStructure != "" && r.Structure != selectedStructure {
+			continue
+		}
+		if difficulty != "" && !strings.EqualFold(r.Difficulty, difficulty) {
 			continue
 		}
 		if unsolvedOnly && r.Solutions > 0 {

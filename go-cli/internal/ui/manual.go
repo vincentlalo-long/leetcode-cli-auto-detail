@@ -184,6 +184,13 @@ var CommandDocs = map[string]CommandDoc{
 		Description: "Scans workspace problem folders and automatically builds a clickable Markdown index table with problem statistics and relative links to solution files and problem READMEs.",
 		Examples:    []string{"readme", "build-readme"},
 	},
+	"review": {
+		Name:        "review",
+		Summary:     "Spaced-repetition review queue for solved problems",
+		Usage:       "review [number] | --list | --due | --solve <num> | --unsolve <num>",
+		Description: "Lists solved problems that are due for revision using a spaced-repetition schedule (1, 3, 7, 15, 30, 60 days). Select a problem to mark it reviewed and schedule the next session. Submit results are recorded automatically in .leet/progress.json.",
+		Examples:    []string{"review", "review --due", "review 1", "review --solve 1", "review --list"},
+	},
 	"clear": {
 		Name:        "clear",
 		Summary:     "Clear TUI terminal output",

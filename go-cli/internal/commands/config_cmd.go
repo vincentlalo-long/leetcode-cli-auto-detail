@@ -97,24 +97,26 @@ func ManageConfig(args []string, cfg *config.Config, ui UI) {
 		}
 
 	case strings.HasPrefix(selected, "4."):
+		ui.WriteOutput(MsgInfo, "Tip: you can also use the LEETCODE_SESSION env var instead of storing the cookie.")
 		session := ui.PromptText("Enter LEETCODE_SESSION cookie value")
 		if session != "" {
 			cfg.LeetcodeSession = strings.TrimSpace(session)
 			if err := cfg.Save(); err != nil {
 				ui.WriteOutput(MsgError, "Failed to save config: %v", err)
 			} else {
-				ui.WriteOutput(MsgSuccess, "Updated leetcode_session cookie.")
+				ui.WriteOutput(MsgSuccess, "Updated leetcode_session cookie (stored in %s).", cfg.GetPath())
 			}
 		}
 
 	case strings.HasPrefix(selected, "5."):
+		ui.WriteOutput(MsgInfo, "Tip: you can also use the LEETCODE_CSRF env var instead of storing the token.")
 		csrf := ui.PromptText("Enter csrftoken cookie value")
 		if csrf != "" {
 			cfg.LeetcodeCsrf = strings.TrimSpace(csrf)
 			if err := cfg.Save(); err != nil {
 				ui.WriteOutput(MsgError, "Failed to save config: %v", err)
 			} else {
-				ui.WriteOutput(MsgSuccess, "Updated leetcode_csrf token.")
+				ui.WriteOutput(MsgSuccess, "Updated leetcode_csrf token (stored in %s).", cfg.GetPath())
 			}
 		}
 

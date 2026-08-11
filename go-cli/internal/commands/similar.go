@@ -18,7 +18,13 @@ type SimilarProblem struct {
 func Similar(args []string, cfg *config.Config, ui UI) {
 	ui.WriteOutput(MsgPlain, "--- Find Similar Problems ---\n")
 
-	problemNum := ui.PromptText("Enter problem number")
+	problemNum := ""
+	if len(args) > 0 {
+		problemNum = args[0]
+	}
+	if problemNum == "" {
+		problemNum = ui.PromptText("Enter problem number")
+	}
 	if problemNum == "" {
 		return
 	}

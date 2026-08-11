@@ -54,6 +54,7 @@ var Registry = map[string]Handler{
 	"clean":             CleanWorkspace,
 	"readme":            BuildReadme,
 	"build-readme":      BuildReadme,
+	"review":            ReviewQueue,
 }
 
 

@@ -3,17 +3,25 @@ package commands
 import (
 	"os"
 	"path/filepath"
+	"regexp"
 	"time"
 
 	"leetcli/internal/api"
 	"leetcli/internal/config"
 	"leetcli/internal/template"
+	"leetcli/internal/tracker"
 )
 
 func SubmitProblem(args []string, cfg *config.Config, ui UI) {
 	ui.WriteOutput(MsgPlain, "--- LeetCode Submit ---\n")
 
-	problemNum := ui.PromptText("Enter problem number to submit")
+	problemNum := ""
+	if len(args) > 0 {
+		problemNum = args[0]
+	}
+	if problemNum == "" {
+		problemNum = ui.PromptText("Enter problem number to submit")
+	}
 	if problemNum == "" {
 		return
 	}
@@ -97,14 +105,16 @@ func SubmitProblem(args []string, cfg *config.Config, ui UI) {
 		return
 	}
 
-	if cfg.LeetcodeSession == "" || cfg.LeetcodeCsrf == "" {
-		ui.WriteOutput(MsgError, "LeetCode submit requires leetcode_session and leetcode_csrf in config.")
-		ui.WriteOutput(MsgInfo, "Please set these values in your config.json.")
+	session := cfg.GetLeetcodeSession()
+	csrf := cfg.GetLeetcodeCsrf()
+	if session == "" || csrf == "" {
+		ui.WriteOutput(MsgError, "LeetCode submit requires leetcode_session and leetcode_csrf.")
+		ui.WriteOutput(MsgInfo, "Set them in config.local.json or use LEETCODE_SESSION / LEETCODE_CSRF env vars.")
 		return
 	}
 
 	ui.WriteOutput(MsgInfo, "Submitting %s solution to LeetCode (slug: %s)...", lcLang, slug)
-	subID, err := api.SubmitSolution(cfg.LeetcodeSession, cfg.LeetcodeCsrf, slug, details.QuestionID, lcLang, content)
+	subID, err := api.SubmitSolution(session, csrf, slug, details.QuestionID, lcLang, content)
 	if err != nil {
 		ui.WriteOutput(MsgError, "Submission failed: %v", err)
 		return
@@ -113,7 +123,7 @@ func SubmitProblem(args []string, cfg *config.Config, ui UI) {
 	ui.WriteOutput(MsgInfo, "Submission ID: %s. Polling for results...", subID)
 	for i := 0; i < 15; i++ {
 		time.Sleep(2 * time.Second)
-		res, err := api.CheckSubmissionStatus(cfg.LeetcodeSession, cfg.LeetcodeCsrf, subID)
+		res, err := api.CheckSubmissionStatus(session, csrf, subID)
 		if err != nil {
 			ui.WriteOutput(MsgError, "Error checking status: %v", err)
 			continue
@@ -125,15 +135,20 @@ func SubmitProblem(args []string, cfg *config.Config, ui UI) {
 
 		if res.StatusMsg == "Accepted" {
 			ui.WriteOutput(MsgSuccess, "✔ ACCEPTED!")
+			runtime := ""
+			memory := ""
 			if res.StatusRuntime != "" {
-				ui.WriteOutput(MsgPlain, "  Runtime: %s (Beats %.2f%%)", res.StatusRuntime, res.RuntimePercentile)
+				runtime = res.StatusRuntime
+				ui.WriteOutput(MsgPlain, "  Runtime: %s (Beats %.2f%%)", runtime, res.RuntimePercentile)
 			}
 			if res.StatusMemory != "" {
-				ui.WriteOutput(MsgPlain, "  Memory:  %s (Beats %.2f%%)", res.StatusMemory, res.MemoryPercentile)
+				memory = res.StatusMemory
+				ui.WriteOutput(MsgPlain, "  Memory:  %s (Beats %.2f%%)", memory, res.MemoryPercentile)
 			}
 			if res.TotalTestcases > 0 {
 				ui.WriteOutput(MsgPlain, "  Testcases: %d / %d", res.TotalCorrect, res.TotalTestcases)
 			}
+			recordSubmission(cfg, targetFile, slug, details, runtime, memory, true, ui)
 		} else {
 			ui.WriteOutput(MsgError, "✘ Result: %s", res.StatusMsg)
 			if res.TotalTestcases > 0 {
@@ -158,4 +173,40 @@ func SubmitProblem(args []string, cfg *config.Config, ui UI) {
 	}
 
 	ui.WriteOutput(MsgError, "Timed out waiting for submission result.")
+}
+
+// recordSubmission persists the result of a submit/test run into the progress tracker.
+func recordSubmission(cfg *config.Config, targetFile, slug string, details *api.ProblemDetail, runtime, memory string, accepted bool, ui UI) {
+	if cfg.BaseDir == "" {
+		return
+	}
+	prog := tracker.Load(cfg.BaseDir)
+	number := ""
+	title := details.Title
+	difficulty := details.Difficulty
+	category := template.DetectStructure(targetFile, cfg.GetDataStructures())
+
+	base := filepath.Base(targetFile)
+	re := regexp.MustCompile(`^(\d+)`)
+	if m := re.FindStringSubmatch(base); len(m) == 2 {
+		number = m[1]
+	}
+	if number == "" {
+		number = api.Slugify(title)
+	}
+
+	status := "unsolved"
+	if accepted {
+		status = "solved"
+	}
+	prog.Upsert(cfg.BaseDir, number, title, slug, difficulty, category, status, runtime, memory)
+	if err := prog.Save(cfg.BaseDir); err != nil {
+		ui.WriteOutput(MsgError, "Warning: could not save progress: %v", err)
+		return
+	}
+	if accepted {
+		ui.WriteOutput(MsgSuccess, "Progress saved: %s marked as solved.", number)
+	} else {
+		ui.WriteOutput(MsgInfo, "Submission attempt recorded for %s.", number)
+	}
 }

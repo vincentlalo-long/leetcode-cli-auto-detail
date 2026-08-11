@@ -15,7 +15,13 @@ import (
 func RunProblem(args []string, cfg *config.Config, ui UI) {
 	ui.WriteOutput(MsgPlain, "--- Run Code ---\n")
 
-	problemNum := ui.PromptText("Enter problem number to run")
+	problemNum := ""
+	if len(args) > 0 {
+		problemNum = args[0]
+	}
+	if problemNum == "" {
+		problemNum = ui.PromptText("Enter problem number to run")
+	}
 	if problemNum == "" {
 		return
 	}

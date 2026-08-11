@@ -14,6 +14,9 @@ import (
 func Daily(args []string, cfg *config.Config, ui UI) {
 	ui.WriteOutput(MsgPlain, "--- LeetCode Daily Challenge ---\n")
 
+	_, flags := parseFlags(args)
+	autoAdd := hasFlag(flags, "add") || hasFlag(flags, "yes") || hasFlag(flags, "y")
+
 	ui.WriteOutput(MsgInfo, "Fetching daily challenge...")
 	detail, _, _, err := api.GetDailyChallenge()
 	if err != nil {
@@ -59,7 +62,10 @@ func Daily(args []string, cfg *config.Config, ui UI) {
 	ui.WriteOutput(MsgInfo, "Tags: %s", tagsStr)
 	ui.WriteOutput(MsgInfo, "Link: %s", leetLink)
 
-	addIt := ui.PromptConfirm("Add this problem to your workspace?")
+	addIt := autoAdd
+	if !addIt {
+		addIt = ui.PromptConfirm("Add this problem to your workspace?")
+	}
 	if !addIt {
 		return
 	}
@@ -76,7 +82,13 @@ func Daily(args []string, cfg *config.Config, ui UI) {
 	}
 	dsChoices = append(dsChoices, "Add new data structure")
 
-	selected := ui.PromptSelect("Select data structure", dsChoices)
+	selected := ""
+	if hasFlag(flags, "ds") {
+		selected = flags["ds"]
+	}
+	if selected == "" {
+		selected = ui.PromptSelect("Select data structure", dsChoices)
+	}
 	if selected == "Add new data structure" {
 		name := ui.PromptText("Data structure name (e.g., tree)")
 		folder := name
@@ -110,9 +122,18 @@ func Daily(args []string, cfg *config.Config, ui UI) {
 	for k, v := range cfg.Languages {
 		languages[k] = template.LanguageInfo{Label: v.Label, Ext: v.Ext}
 	}
-	langChoices, langMapping := template.GetLanguageChoices(languages, cfg.DefaultLanguage)
-	langChoice := ui.PromptSelect("Select language", langChoices)
-	langKey := langMapping[langChoice]
+	langKey := ""
+	if hasFlag(flags, "lang") {
+		langKey = resolveLangFlag(languages, flags["lang"])
+	}
+	if langKey == "" {
+		langChoices, langMapping := template.GetLanguageChoices(languages, cfg.DefaultLanguage)
+		langChoice := ui.PromptSelect("Select language", langChoices)
+		langKey = langMapping[langChoice]
+	}
+	if langKey == "" {
+		langKey = cfg.DefaultLanguage
+	}
 	langExt := languages[langKey].Ext
 
 	folderName := fmt.Sprintf("%s-%s", problemNum, slug)

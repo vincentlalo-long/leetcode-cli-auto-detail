@@ -15,8 +15,25 @@ import (
 func Random(args []string, cfg *config.Config, ui UI) {
 	ui.WriteOutput(MsgPlain, "--- Random LeetCode Problem ---\n")
 
+	_, flags := parseFlags(args)
+	autoAdd := hasFlag(flags, "add") || hasFlag(flags, "yes") || hasFlag(flags, "y")
+
 	difficultyChoices := []string{"Any", "Easy", "Medium", "Hard"}
-	selectedDifficulty := ui.PromptSelect("Select difficulty level", difficultyChoices)
+	selectedDifficulty := ""
+	if hasFlag(flags, "difficulty") || hasFlag(flags, "diff") {
+		d := flags["difficulty"]
+		if d == "" {
+			d = flags["diff"]
+		}
+		selectedDifficulty = strings.Title(strings.ToLower(d))
+		if selectedDifficulty != "Any" && !isDifficulty(selectedDifficulty) {
+			ui.WriteOutput(MsgError, "Invalid difficulty: %s", selectedDifficulty)
+			return
+		}
+	}
+	if selectedDifficulty == "" {
+		selectedDifficulty = ui.PromptSelect("Select difficulty level", difficultyChoices)
+	}
 
 	ui.WriteOutput(MsgInfo, "Fetching problems...")
 	data, err := api.GetAllProblems()
@@ -71,7 +88,10 @@ func Random(args []string, cfg *config.Config, ui UI) {
 	ui.WriteOutput(MsgInfo, "Difficulty: %s", difficulty)
 	ui.WriteOutput(MsgInfo, "Link: %s", link)
 
-	addIt := ui.PromptConfirm("Add this problem to your workspace?")
+	addIt := autoAdd
+	if !addIt {
+		addIt = ui.PromptConfirm("Add this problem to your workspace?")
+	}
 	if !addIt {
 		return
 	}
@@ -88,7 +108,13 @@ func Random(args []string, cfg *config.Config, ui UI) {
 	}
 	dsChoices = append(dsChoices, "Add new data structure")
 
-	selected := ui.PromptSelect("Select data structure", dsChoices)
+	selected := ""
+	if hasFlag(flags, "ds") {
+		selected = flags["ds"]
+	}
+	if selected == "" {
+		selected = ui.PromptSelect("Select data structure", dsChoices)
+	}
 	if selected == "Add new data structure" {
 		name := ui.PromptText("Data structure name (e.g., tree)")
 		folder := name
@@ -122,9 +148,18 @@ func Random(args []string, cfg *config.Config, ui UI) {
 	for k, v := range cfg.Languages {
 		languages[k] = template.LanguageInfo{Label: v.Label, Ext: v.Ext}
 	}
-	langChoices, langMapping := template.GetLanguageChoices(languages, cfg.DefaultLanguage)
-	langChoice := ui.PromptSelect("Select language", langChoices)
-	langKey := langMapping[langChoice]
+	langKey := ""
+	if hasFlag(flags, "lang") {
+		langKey = resolveLangFlag(languages, flags["lang"])
+	}
+	if langKey == "" {
+		langChoices, langMapping := template.GetLanguageChoices(languages, cfg.DefaultLanguage)
+		langChoice := ui.PromptSelect("Select language", langChoices)
+		langKey = langMapping[langChoice]
+	}
+	if langKey == "" {
+		langKey = cfg.DefaultLanguage
+	}
 	langExt := languages[langKey].Ext
 
 	folderName := fmt.Sprintf("%s-%s", problemNum, slug)

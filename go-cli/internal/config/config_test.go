@@ -1,6 +1,7 @@
 package config
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"testing"
@@ -21,19 +22,19 @@ func TestDefaultConfig(t *testing.T) {
 
 func TestAddRemoveDataStructure(t *testing.T) {
 	cfg := Default()
-	if !cfg.AddDataStructure("tree", "tree") {
-		t.Errorf("AddDataStructure(tree) failed")
+	if !cfg.AddDataStructure("trie", "trie") {
+		t.Errorf("AddDataStructure(trie) failed")
 	}
-	if cfg.GetDataStructures()["tree"] != "tree" {
-		t.Errorf("GetDataStructures()[tree] = %q, want tree", cfg.GetDataStructures()["tree"])
+	if cfg.GetDataStructures()["trie"] != "trie" {
+		t.Errorf("GetDataStructures()[trie] = %q, want trie", cfg.GetDataStructures()["trie"])
 	}
 	// Adding again should return false
-	if cfg.AddDataStructure("tree", "tree") {
+	if cfg.AddDataStructure("trie", "trie") {
 		t.Errorf("AddDataStructure duplicate should return false")
 	}
 
-	if !cfg.RemoveDataStructure("tree") {
-		t.Errorf("RemoveDataStructure(tree) failed")
+	if !cfg.RemoveDataStructure("trie") {
+		t.Errorf("RemoveDataStructure(trie) failed")
 	}
 	if cfg.RemoveDataStructure("nonexistent") {
 		t.Errorf("RemoveDataStructure(nonexistent) should return false")
@@ -66,5 +67,76 @@ func TestSaveAndLoadConfig(t *testing.T) {
 	}
 	if loaded.LeetcodeCsrf != "test_csrf_456" {
 		t.Errorf("LeetcodeCsrf = %q, want test_csrf_456", loaded.LeetcodeCsrf)
+	}
+}
+
+func TestLoadOverlaysLocalConfig(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	workspaceDir := filepath.Join(tmpDir, "workspace")
+	os.MkdirAll(workspaceDir, 0755)
+
+	baseCfg := `{"base_dir": "", "default_language": "cpp", "editor": "code"}`
+	localMap := map[string]interface{}{
+		"base_dir":         workspaceDir,
+		"editor":           "vim",
+		"leetcode_session": "local_session",
+	}
+	localData, _ := json.Marshal(localMap)
+
+	os.WriteFile(filepath.Join(tmpDir, "config.json"), []byte(baseCfg), 0644)
+	os.WriteFile(filepath.Join(tmpDir, "config.local.json"), localData, 0644)
+
+	cfg, err := Load(filepath.Join(tmpDir, "config.json"))
+	if err != nil {
+		t.Fatalf("Load failed: %v", err)
+	}
+	if cfg.BaseDir != workspaceDir {
+		t.Errorf("BaseDir = %q, want %q (overlay should win)", cfg.BaseDir, workspaceDir)
+	}
+	if cfg.Editor != "vim" {
+		t.Errorf("Editor = %q, want vim", cfg.Editor)
+	}
+	if cfg.DefaultLanguage != "cpp" {
+		t.Errorf("DefaultLanguage = %q, want cpp (base value preserved)", cfg.DefaultLanguage)
+	}
+	if cfg.LeetcodeSession != "local_session" {
+		t.Errorf("LeetcodeSession = %q, want local_session", cfg.LeetcodeSession)
+	}
+}
+
+func TestEnvVarsOverrideCookies(t *testing.T) {
+	tmpDir := t.TempDir()
+	cfgPath := filepath.Join(tmpDir, "config.json")
+	os.WriteFile(cfgPath, []byte(`{}`), 0644)
+
+	os.Setenv("LEETCODE_SESSION", "env_session")
+	os.Setenv("LEETCODE_CSRF", "env_csrf")
+	defer os.Unsetenv("LEETCODE_SESSION")
+	defer os.Unsetenv("LEETCODE_CSRF")
+
+	cfg, err := Load(cfgPath)
+	if err != nil {
+		t.Fatalf("Load failed: %v", err)
+	}
+	if cfg.GetLeetcodeSession() != "env_session" {
+		t.Errorf("GetLeetcodeSession() = %q, want env_session", cfg.GetLeetcodeSession())
+	}
+	if cfg.GetLeetcodeCsrf() != "env_csrf" {
+		t.Errorf("GetLeetcodeCsrf() = %q, want env_csrf", cfg.GetLeetcodeCsrf())
+	}
+}
+
+func TestResolveBaseDir(t *testing.T) {
+	tmpDir := t.TempDir()
+	os.MkdirAll(filepath.Join(tmpDir, ".git"), 0755)
+
+	cfg := Default()
+	cfg.SetPath(filepath.Join(tmpDir, "config.local.json"))
+	cfg.BaseDir = ""
+	cfg.ResolveBaseDir()
+
+	if cfg.BaseDir != tmpDir {
+		t.Errorf("ResolveBaseDir() = %q, want %q (repo root with .git)", cfg.BaseDir, tmpDir)
 	}
 }

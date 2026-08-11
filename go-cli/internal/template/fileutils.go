@@ -9,6 +9,23 @@ import (
 	"strings"
 )
 
+var ignoredDirs = map[string]bool{
+	".git":           true,
+	".github":        true,
+	"go-cli":         true,
+	"python_version": true,
+	"extension":      true,
+	"node_modules":   true,
+	"scratch":        true,
+	".vscode":        true,
+	".idea":          true,
+	"bin":            true,
+}
+
+func IsIgnoredDir(name string) bool {
+	return ignoredDirs[strings.ToLower(name)]
+}
+
 func GetAllSolutionFiles(baseDir string, extensions []string) []string {
 	extSet := make(map[string]bool)
 	for _, ext := range extensions {
@@ -19,7 +36,13 @@ func GetAllSolutionFiles(baseDir string, extensions []string) []string {
 
 	var files []string
 	filepath.Walk(baseDir, func(path string, info os.FileInfo, err error) error {
-		if err != nil || info.IsDir() {
+		if err != nil {
+			return nil
+		}
+		if info.IsDir() {
+			if path != baseDir && IsIgnoredDir(info.Name()) {
+				return filepath.SkipDir
+			}
 			return nil
 		}
 		ext := strings.TrimLeft(filepath.Ext(path), ".")

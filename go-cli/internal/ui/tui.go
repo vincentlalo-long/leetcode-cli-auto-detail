@@ -477,8 +477,8 @@ func (m *Model) interactiveHelp() {
 	orderedCmds := []string{
 		"add", "add-sol", "list", "search", "manage-structures",
 		"stats", "theme", "daily", "random", "hint", "similar",
-		"open", "web", "run", "test", "submit", "timer", "note", "sync",
-		"clean", "profile", "contest", "config", "clear", "exit",
+		"open", "web", "run", "test", "submit", "timer", "note", "review",
+		"sync", "clean", "profile", "contest", "config", "clear", "exit",
 	}
 
 	var choices []string
@@ -515,7 +515,7 @@ var allCommands = []string{
 	"add", "add-sol", "list", "search", "manage-structures",
 	"stats", "theme", "daily", "random", "hint", "similar",
 	"open", "web", "browser", "run", "test", "submit", "timer",
-	"note", "clean", "sync", "profile", "contest", "config", "cfg",
+	"note", "review", "clean", "sync", "profile", "contest", "config", "cfg",
 	"help", "clear", "exit", "quit",
 }
 
