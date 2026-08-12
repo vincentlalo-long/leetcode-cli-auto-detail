@@ -11,7 +11,13 @@ import (
 func Hint(args []string, cfg *config.Config, ui UI) {
 	ui.WriteOutput(MsgPlain, "--- Get Problem Hints ---\n")
 
-	problemNum := ui.PromptText("Enter problem number")
+	problemNum := ""
+	if len(args) > 0 {
+		problemNum = args[0]
+	}
+	if problemNum == "" {
+		problemNum = ui.PromptText("Enter problem number")
+	}
 	if problemNum == "" {
 		return
 	}

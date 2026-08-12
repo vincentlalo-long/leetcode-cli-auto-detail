@@ -3,10 +3,10 @@ package commands
 import (
 	"fmt"
 	"os"
-	"strings"
 
 	"leetcli/internal/config"
 	"leetcli/internal/template"
+	"leetcli/internal/tracker"
 )
 
 func Stats(args []string, cfg *config.Config, ui UI) {
@@ -44,16 +44,10 @@ func Stats(args []string, cfg *config.Config, ui UI) {
 	unmatched := 0
 
 	for _, f := range files {
-		matched := false
-		for name, folder := range dataStructures {
-			token := strings.ToLower("/" + folder + "/")
-			if strings.Contains(strings.ToLower(f), token) {
-				byStructure[name]++
-				matched = true
-				break
-			}
-		}
-		if !matched {
+		structName := template.DetectStructure(f, dataStructures)
+		if structName != "unmatched" {
+			byStructure[structName]++
+		} else {
 			unmatched++
 		}
 
@@ -78,6 +72,28 @@ func Stats(args []string, cfg *config.Config, ui UI) {
 
 	if unmatched > 0 {
 		ui.WriteOutput(MsgInfo, "Unmatched problems: %d", unmatched)
+	}
+
+	prog := tracker.Load(baseDir)
+	if len(prog.Problems) > 0 {
+		solved := 0
+		byDiff := map[string]int{}
+		due := prog.DueReviews()
+		for _, e := range prog.Problems {
+			if e.Status == "solved" {
+				solved++
+				byDiff[e.Difficulty]++
+			}
+		}
+		ui.WriteOutput(MsgPlain, "\nProgress Tracker (.leet/progress.json):")
+		ui.WriteOutput(MsgInfo, "Tracked problems: %d", len(prog.Problems))
+		ui.WriteOutput(MsgInfo, "Solved (accepted): %d", solved)
+		if len(byDiff) > 0 {
+			ui.WriteOutput(MsgInfo, "  Easy: %d | Medium: %d | Hard: %d", byDiff["Easy"], byDiff["Medium"], byDiff["Hard"])
+		}
+		ui.WriteOutput(MsgInfo, "Due for review: %d", len(due))
+	} else {
+		ui.WriteOutput(MsgInfo, "No progress tracked yet. Submit solutions or use 'review --solve <num>'.")
 	}
 }
 

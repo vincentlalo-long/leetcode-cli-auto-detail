@@ -1,5 +1,5 @@
 {
-  "base_dir": "D:/template-custom-leetcode",
+  "base_dir": "",
   "languages": {
     "c": {
       "label": "C",
@@ -21,11 +21,21 @@
   "default_language": "cpp",
   "data_structures": {
     "array": "array",
-    "graph": "graph",
+    "string": "string",
     "linkedlist": "linked_list",
-    "queue": "queue",
     "stack": "stack",
-    "string": "string"
+    "queue": "queue",
+    "graph": "graph",
+    "tree": "tree",
+    "heap": "heap",
+    "hash": "hash",
+    "dp": "dp",
+    "binary": "binary",
+    "two-pointer": "two_pointers",
+    "sliding": "sliding_window",
+    "backtracking": "backtracking",
+    "greedy": "greedy",
+    "math": "math"
   },
   "theme": "default",
   "editor": "code"

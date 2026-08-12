@@ -23,7 +23,13 @@ func SearchProblems(args []string, cfg *config.Config, ui UI) {
 		return
 	}
 
-	query := ui.PromptText("Enter problem name or number to search")
+	query := ""
+	if len(args) > 0 {
+		query = strings.Join(args, " ")
+	}
+	if strings.TrimSpace(query) == "" {
+		query = ui.PromptText("Enter problem name or number to search")
+	}
 	if strings.TrimSpace(query) == "" {
 		ui.WriteOutput(MsgError, "Search query cannot be empty.")
 		return

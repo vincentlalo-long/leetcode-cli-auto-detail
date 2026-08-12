@@ -14,7 +14,13 @@ import (
 func TestProblem(args []string, cfg *config.Config, ui UI) {
 	ui.WriteOutput(MsgPlain, "--- LeetCode Test ---\n")
 
-	problemNum := ui.PromptText("Enter problem number to test")
+	problemNum := ""
+	if len(args) > 0 {
+		problemNum = args[0]
+	}
+	if problemNum == "" {
+		problemNum = ui.PromptText("Enter problem number to test")
+	}
 	if problemNum == "" {
 		return
 	}
@@ -98,9 +104,11 @@ func TestProblem(args []string, cfg *config.Config, ui UI) {
 		return
 	}
 
-	if cfg.LeetcodeSession == "" || cfg.LeetcodeCsrf == "" {
-		ui.WriteOutput(MsgError, "LeetCode test requires leetcode_session and leetcode_csrf in config.")
-		ui.WriteOutput(MsgInfo, "Please set these values in your config.json.")
+	session := cfg.GetLeetcodeSession()
+	csrf := cfg.GetLeetcodeCsrf()
+	if session == "" || csrf == "" {
+		ui.WriteOutput(MsgError, "LeetCode test requires leetcode_session and leetcode_csrf.")
+		ui.WriteOutput(MsgInfo, "Set them in config.local.json or use LEETCODE_SESSION / LEETCODE_CSRF env vars.")
 		return
 	}
 
@@ -117,7 +125,7 @@ func TestProblem(args []string, cfg *config.Config, ui UI) {
 	}
 
 	ui.WriteOutput(MsgInfo, "Sending test run to LeetCode (%s)...", lcLang)
-	interpretID, err := api.InterpretSolution(cfg.LeetcodeSession, cfg.LeetcodeCsrf, slug, details.QuestionID, lcLang, content, testcases)
+	interpretID, err := api.InterpretSolution(session, csrf, slug, details.QuestionID, lcLang, content, testcases)
 	if err != nil {
 		ui.WriteOutput(MsgError, "Test run request failed: %v", err)
 		return
@@ -126,7 +134,7 @@ func TestProblem(args []string, cfg *config.Config, ui UI) {
 	ui.WriteOutput(MsgInfo, "Test Run ID: %s. Polling for results...", interpretID)
 	for i := 0; i < 15; i++ {
 		time.Sleep(2 * time.Second)
-		res, err := api.CheckSubmissionStatus(cfg.LeetcodeSession, cfg.LeetcodeCsrf, interpretID)
+		res, err := api.CheckSubmissionStatus(session, csrf, interpretID)
 		if err != nil {
 			ui.WriteOutput(MsgError, "Error checking status: %v", err)
 			continue

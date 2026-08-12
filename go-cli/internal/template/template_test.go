@@ -1,6 +1,8 @@
 package template
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 )
 
@@ -59,9 +61,20 @@ func TestStripHTMLTags(t *testing.T) {
 }
 
 func TestGenerateRootReadme(t *testing.T) {
-	readmePath, count, err := GenerateRootReadme("D:/template-custom-leetcode", nil)
+	tmpDir := t.TempDir()
+
+	os.MkdirAll(filepath.Join(tmpDir, "array", "1-two-sum"), 0755)
+	os.WriteFile(filepath.Join(tmpDir, "array", "1-two-sum", "README.md"), []byte("# [1. Two Sum](https://leetcode.com/problems/two-sum/)\n\n- **Difficulty:** Easy\n"), 0644)
+	os.WriteFile(filepath.Join(tmpDir, "array", "1-two-sum", "1_two_sum.cpp"), []byte("int main(){}"), 0644)
+
+	readmePath, count, err := GenerateRootReadme(tmpDir, nil)
 	if err != nil {
 		t.Fatalf("GenerateRootReadme failed: %v", err)
 	}
-	t.Logf("Generated README at %s with %d problems", readmePath, count)
+	if count != 1 {
+		t.Errorf("GenerateRootReadme count = %d, want 1", count)
+	}
+	if _, err := os.Stat(readmePath); err != nil {
+		t.Errorf("generated README missing: %v", err)
+	}
 }

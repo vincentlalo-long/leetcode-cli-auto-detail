@@ -18,10 +18,10 @@ func RenderBanner() string {
 const helpText = `Available commands:
   add              Create a new problem
   add-sol          Add a solution to a problem
-  list             List and filter problems
+  list             List and filter problems (--ds, --difficulty, --unsolved)
   search           Search problems by name or number
   manage-structures Manage data structures
-  stats            Show problem statistics
+  stats            Show problem statistics + progress
   theme            Change the UI theme
   daily            Get and add LeetCode daily challenge
   random           Get a random LeetCode problem
@@ -31,11 +31,14 @@ const helpText = `Available commands:
   run              Compile or run code locally
   test             Run LeetCode testcases for a solution
   submit           Submit solution to LeetCode and show benchmark
+  review           Spaced-repetition review queue for solved problems
   sync             Sync LeetCode workspace with Git
   profile          View LeetCode user profile stats
   contest          View upcoming LeetCode contests
   help, /help      Show this help message
   exit, quit       Exit the CLI
+
+Tip: any command also works from the shell:  leet list --difficulty Easy
 `
 
 func RenderHelp() string {

@@ -14,7 +14,18 @@ import (
 func AddProblem(args []string, cfg *config.Config, ui UI) {
 	ui.WriteOutput(MsgPlain, "--- Add New Problem ---\n")
 
-	problemNum := ui.PromptText("Problem number")
+	pos, flags := parseFlags(args)
+
+	problemNum := ""
+	if len(pos) > 0 {
+		problemNum = pos[0]
+	}
+	if problemNum == "" && hasFlag(flags, "num") {
+		problemNum = flags["num"]
+	}
+	if problemNum == "" {
+		problemNum = ui.PromptText("Problem number")
+	}
 	if problemNum == "" {
 		return
 	}
@@ -29,7 +40,13 @@ func AddProblem(args []string, cfg *config.Config, ui UI) {
 		ui.WriteOutput(MsgError, "Could not find problem with ID %s", problemNum)
 	}
 
-	problemName := ui.PromptText(fmt.Sprintf("Problem name (suggested: %s)", suggestedName))
+	problemName := ""
+	if hasFlag(flags, "name") {
+		problemName = flags["name"]
+	}
+	if problemName == "" {
+		problemName = ui.PromptText(fmt.Sprintf("Problem name (suggested: %s)", suggestedName))
+	}
 	if problemName == "" && suggestedName != "" {
 		problemName = suggestedName
 	}
@@ -45,7 +62,13 @@ func AddProblem(args []string, cfg *config.Config, ui UI) {
 	}
 	dsChoices = append(dsChoices, "Add new data structure")
 
-	selected := ui.PromptSelect("Select data structure", dsChoices)
+	selected := ""
+	if hasFlag(flags, "ds") {
+		selected = flags["ds"]
+	}
+	if selected == "" {
+		selected = ui.PromptSelect("Select data structure", dsChoices)
+	}
 
 	if selected == "Add new data structure" {
 		name := ui.PromptText("Data structure name (e.g., tree)")
@@ -80,9 +103,18 @@ func AddProblem(args []string, cfg *config.Config, ui UI) {
 	for k, v := range cfg.Languages {
 		languages[k] = template.LanguageInfo{Label: v.Label, Ext: v.Ext}
 	}
-	langChoices, langMapping := template.GetLanguageChoices(languages, cfg.DefaultLanguage)
-	langChoice := ui.PromptSelect("Select language", langChoices)
-	langKey := langMapping[langChoice]
+	langKey := ""
+	if hasFlag(flags, "lang") {
+		langKey = resolveLangFlag(languages, flags["lang"])
+	}
+	if langKey == "" {
+		langChoices, langMapping := template.GetLanguageChoices(languages, cfg.DefaultLanguage)
+		langChoice := ui.PromptSelect("Select language", langChoices)
+		langKey = langMapping[langChoice]
+	}
+	if langKey == "" {
+		langKey = cfg.DefaultLanguage
+	}
 	langExt := languages[langKey].Ext
 
 	slug := api.Slugify(problemName)

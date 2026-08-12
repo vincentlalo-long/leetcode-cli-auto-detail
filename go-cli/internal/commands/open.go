@@ -14,7 +14,13 @@ import (
 func OpenProblem(args []string, cfg *config.Config, ui UI) {
 	ui.WriteOutput(MsgPlain, "--- Open Problem ---\n")
 
-	problemNum := ui.PromptText("Enter problem number to open")
+	problemNum := ""
+	if len(args) > 0 {
+		problemNum = args[0]
+	}
+	if problemNum == "" {
+		problemNum = ui.PromptText("Enter problem number to open")
+	}
 	if problemNum == "" {
 		return
 	}
