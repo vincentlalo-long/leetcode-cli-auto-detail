@@ -72,18 +72,16 @@ func TestFormatDescriptionMarkdown(t *testing.T) {
 	html := `<p>Given an array of integers <code>nums</code>&nbsp;and an integer <code>target</code>.</p>
 
 <p>&nbsp;</p>
-Example 1:
+<p><strong class="example">Example 1:</strong></p>
+<pre><strong>Input:</strong> nums = [2,7,11,15], target = 9 <strong>Output:</strong> [0,1] <strong>Explanation:</strong> Because nums[0] + nums[1] == 9, we return [0, 1].</pre>
 
-<pre>Input: nums = [2,7,11,15], target = 9 Output: [0,1] Explanation: Because nums[0] + nums[1] == 9, we return [0, 1].</pre>
-
-<p>&nbsp;</p>
-Constraints:
-
-<pre>2 &lt;= nums.length &lt;= 104
--109 &lt;= nums[i] &lt;= 109</pre>
+<p><strong>Constraints:</strong></p>
+<ul>
+<li><code>2 &lt;= nums.length &lt;= 10<sup>4</sup></code></li><li><code>-10<sup>9</sup> &lt;= nums[i] &lt;= 10<sup>9</sup></code></li><li><code>-10<sup>9</sup> &lt;= target &lt;= 10<sup>9</sup></code></li><li><code>Only one valid answer exists.</code></li>
+</ul>
 
 <p>&nbsp;</p>
-Follow-up:&nbsp;Can you come up with an algorithm that is less than O(n2)&nbsp;time complexity?`
+Follow-up:&nbsp;Can you come up with an algorithm that is less than O(n<sup>2</sup>)&nbsp;time complexity?`
 
 	got := FormatDescriptionMarkdown(html)
 	want := `Given an array of integers nums and an integer target.
@@ -96,10 +94,12 @@ Explanation: Because nums[0] + nums[1] == 9, we return [0, 1].
 
 Constraints:
 
-2 <= nums.length <= 104
--109 <= nums[i] <= 109
+2 <= nums.length <= 10^4
+-10^9 <= nums[i] <= 10^9
+-10^9 <= target <= 10^9
+Only one valid answer exists.
 
-Follow-up: Can you come up with an algorithm that is less than O(n2) time complexity?`
+Follow-up: Can you come up with an algorithm that is less than O(n^2) time complexity?`
 	if got != want {
 		t.Errorf("FormatDescriptionMarkdown() = %q\nwant %q", got, want)
 	}

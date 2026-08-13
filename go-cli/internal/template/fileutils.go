@@ -140,20 +140,46 @@ func DecodeHTMLEntities(s string) string {
 	return s
 }
 
-var sectionStartRe = regexp.MustCompile(`(?i)([^\n])((?:Example\s+\d+|Input|Output|Explanation|Constraints|Follow-up|Follow up)\s*:)`)
+var (
+	// blockTagRe matches block-level tags that should start a new line.
+	blockTagRe = regexp.MustCompile(`(?i)</?(?:li|p|pre|ul|ol|div|h[1-6]|br)\s*/?>`)
+	// supRe / subRe keep superscript/subscript readable, e.g. 10<sup>4</sup> -> 10^4.
+	supRe = regexp.MustCompile(`(?i)<sup>(.*?)</sup>`)
+	subRe = regexp.MustCompile(`(?i)<sub>(.*?)</sub>`)
+	// sectionStartRe breaks lines before known section markers when they appear
+	// mid-line, so fetched descriptions render as clean, line-separated markdown.
+	sectionStartRe = regexp.MustCompile(`(?i)([^\n])((?:Example\s+\d+|Input|Output|Explanation|Constraints|Follow-up|Follow up)\s*:)`)
+)
 
 // breakSectionLines inserts a newline before known section markers (Input:,
-// Output:, Explanation:, ...) when they appear mid-line, so fetched descriptions
-// render as clean, line-separated markdown instead of one long paragraph.
+// Output:, Explanation:, ...) when they appear mid-line.
 func breakSectionLines(s string) string {
 	return sectionStartRe.ReplaceAllString(s, "$1\n$2")
 }
 
+// blockTagToNewline maps a matched block-level tag to a newline. List items
+// become consecutive lines (<li> opens, </li> closes with no blank separator).
+func blockTagToNewline(m string) string {
+	lm := strings.ToLower(m)
+	if strings.HasPrefix(lm, "</li>") {
+		return ""
+	}
+	return "\n"
+}
+
 // FormatDescriptionMarkdown converts a raw LeetCode description (HTML) into
-// clean markdown for a problem README: strips tags, decodes entities, and puts
-// Input/Output/Explanation/Constraints each on their own line.
+// clean markdown for a problem README: block tags become new lines, HTML
+// entities are decoded, superscripts stay readable (10^4), and
+// Input/Output/Explanation/Constraints each land on their own line.
 func FormatDescriptionMarkdown(html string) string {
-	s := StripHTMLTags(html)
+	// Block-level tags -> newlines, so <li>/<p>/<pre> items are not glued
+	// together on one line.
+	s := blockTagRe.ReplaceAllStringFunc(html, blockTagToNewline)
+	// Superscript / subscript -> ^N / _N before tags are stripped.
+	s = supRe.ReplaceAllString(s, "^$1")
+	s = subRe.ReplaceAllString(s, "_$1")
+	// Strip the remaining inline tags.
+	s = stripTagsRe.ReplaceAllString(s, "")
 	s = DecodeHTMLEntities(s)
 	s = breakSectionLines(s)
 	// Drop standalone &nbsp; spacer lines (now blank after decoding) and
