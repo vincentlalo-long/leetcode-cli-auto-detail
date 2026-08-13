@@ -195,7 +195,7 @@ func Random(args []string, cfg *config.Config, ui UI) {
 
 	if details != nil && details.Content != "" {
 		readmePath := filepath.Join(problemDir, "README.md")
-		mdContent := template.StripHTMLTags(details.Content)
+		mdContent := template.FormatDescriptionMarkdown(details.Content)
 		cleanNum := strings.TrimLeft(problemNum, "0")
 		if cleanNum == "" {
 			cleanNum = problemNum

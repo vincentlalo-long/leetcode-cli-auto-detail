@@ -127,6 +127,55 @@ func StripHTMLTags(html string) string {
 	return strings.TrimSpace(re.ReplaceAllString(html, ""))
 }
 
+// DecodeHTMLEntities replaces common HTML entities with their literal text so
+// problem descriptions read correctly as plain markdown (e.g. `&lt;=` -> `<=`).
+func DecodeHTMLEntities(s string) string {
+	s = strings.ReplaceAll(s, "&lt;", "<")
+	s = strings.ReplaceAll(s, "&gt;", ">")
+	s = strings.ReplaceAll(s, "&amp;", "&")
+	s = strings.ReplaceAll(s, "&nbsp;", " ")
+	s = strings.ReplaceAll(s, "&quot;", "\"")
+	s = strings.ReplaceAll(s, "&#39;", "'")
+	s = strings.ReplaceAll(s, "&apos;", "'")
+	return s
+}
+
+var sectionStartRe = regexp.MustCompile(`(?i)([^\n])((?:Example\s+\d+|Input|Output|Explanation|Constraints|Follow-up|Follow up)\s*:)`)
+
+// breakSectionLines inserts a newline before known section markers (Input:,
+// Output:, Explanation:, ...) when they appear mid-line, so fetched descriptions
+// render as clean, line-separated markdown instead of one long paragraph.
+func breakSectionLines(s string) string {
+	return sectionStartRe.ReplaceAllString(s, "$1\n$2")
+}
+
+// FormatDescriptionMarkdown converts a raw LeetCode description (HTML) into
+// clean markdown for a problem README: strips tags, decodes entities, and puts
+// Input/Output/Explanation/Constraints each on their own line.
+func FormatDescriptionMarkdown(html string) string {
+	s := StripHTMLTags(html)
+	s = DecodeHTMLEntities(s)
+	s = breakSectionLines(s)
+	// Drop standalone &nbsp; spacer lines (now blank after decoding) and
+	// collapse runs of blank lines so paragraphs stay readable.
+	lines := strings.Split(s, "\n")
+	out := make([]string, 0, len(lines))
+	blank := 0
+	for _, l := range lines {
+		if strings.TrimSpace(l) == "" {
+			blank++
+			if blank > 1 {
+				continue
+			}
+			out = append(out, "")
+			continue
+		}
+		blank = 0
+		out = append(out, strings.TrimSpace(l))
+	}
+	return strings.TrimSpace(strings.Join(out, "\n"))
+}
+
 func GetSolvedMap(baseDir string, extensions []string) map[string]bool {
 	solved := make(map[string]bool)
 	files := GetAllSolutionFiles(baseDir, extensions)

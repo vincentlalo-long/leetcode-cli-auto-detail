@@ -60,6 +60,51 @@ func TestStripHTMLTags(t *testing.T) {
 	}
 }
 
+func TestDecodeHTMLEntities(t *testing.T) {
+	got := DecodeHTMLEntities("2 &lt;= nums.length &lt;= 104 &amp; x &quot;q&quot; &#39;y&#39; a&nbsp;b")
+	want := `2 <= nums.length <= 104 & x "q" 'y' a b`
+	if got != want {
+		t.Errorf("DecodeHTMLEntities() = %q, want %q", got, want)
+	}
+}
+
+func TestFormatDescriptionMarkdown(t *testing.T) {
+	html := `<p>Given an array of integers <code>nums</code>&nbsp;and an integer <code>target</code>.</p>
+
+<p>&nbsp;</p>
+Example 1:
+
+<pre>Input: nums = [2,7,11,15], target = 9 Output: [0,1] Explanation: Because nums[0] + nums[1] == 9, we return [0, 1].</pre>
+
+<p>&nbsp;</p>
+Constraints:
+
+<pre>2 &lt;= nums.length &lt;= 104
+-109 &lt;= nums[i] &lt;= 109</pre>
+
+<p>&nbsp;</p>
+Follow-up:&nbsp;Can you come up with an algorithm that is less than O(n2)&nbsp;time complexity?`
+
+	got := FormatDescriptionMarkdown(html)
+	want := `Given an array of integers nums and an integer target.
+
+Example 1:
+
+Input: nums = [2,7,11,15], target = 9
+Output: [0,1]
+Explanation: Because nums[0] + nums[1] == 9, we return [0, 1].
+
+Constraints:
+
+2 <= nums.length <= 104
+-109 <= nums[i] <= 109
+
+Follow-up: Can you come up with an algorithm that is less than O(n2) time complexity?`
+	if got != want {
+		t.Errorf("FormatDescriptionMarkdown() = %q\nwant %q", got, want)
+	}
+}
+
 func TestGenerateRootReadme(t *testing.T) {
 	tmpDir := t.TempDir()
 

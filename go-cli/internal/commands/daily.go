@@ -156,7 +156,7 @@ func Daily(args []string, cfg *config.Config, ui UI) {
 	details, _ := api.GetProblemDetails(slug)
 	if details != nil && details.Content != "" {
 		readmePath := filepath.Join(problemDir, "README.md")
-		mdContent := template.StripHTMLTags(details.Content)
+		mdContent := template.FormatDescriptionMarkdown(details.Content)
 		cleanNum := strings.TrimLeft(problemNum, "0")
 		if cleanNum == "" {
 			cleanNum = problemNum

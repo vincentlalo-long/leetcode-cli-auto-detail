@@ -299,11 +299,7 @@ func ExtractExamples(contentHTML string) []Example {
 }
 
 func cleanHTMLText(s string) string {
-	s = strings.ReplaceAll(s, "&lt;", "<")
-	s = strings.ReplaceAll(s, "&gt;", ">")
-	s = strings.ReplaceAll(s, "&amp;", "&")
-	s = strings.ReplaceAll(s, "&nbsp;", " ")
-	s = strings.ReplaceAll(s, "&quot;", "\"")
+	s = DecodeHTMLEntities(s)
 	s = stripTagsRe.ReplaceAllString(s, "")
 	return strings.TrimSpace(s)
 }

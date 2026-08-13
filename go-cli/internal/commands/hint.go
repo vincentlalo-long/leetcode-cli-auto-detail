@@ -46,7 +46,7 @@ func Hint(args []string, cfg *config.Config, ui UI) {
 	ui.WriteOutput(MsgPlain, "\nHints for %s (%d total):", problemData.Title, len(details.Hints))
 
 	for i, hint := range details.Hints {
-		hintText := template.StripHTMLTags(hint)
+		hintText := template.DecodeHTMLEntities(template.StripHTMLTags(hint))
 		ui.WriteOutput(MsgPlain, "  Hint %d: %s", i+1, hintText)
 
 		if i < len(details.Hints)-1 {
