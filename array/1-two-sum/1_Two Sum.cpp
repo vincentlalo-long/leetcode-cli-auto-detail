@@ -6,29 +6,20 @@ Tags: Array, Hash Table
 Data Structure: array
 */
 
-#include <iostream>
 #include <vector>
-#include <string>
 
 using namespace std;
 
-// class Solution {
-// public:
-//     
-// };
-
-int main() {
-    // Solution sol;
-    cout << "Test cases go here!" << endl;
-    return 0;
-}
-
-
-// ================== Solution 1 ==================
-/*
-Method: Hash Table
-Time Complexity: O(n)
-Space Complexity: O(n)
-*/
-
-// Write or paste your solution code here...
+class Solution {
+public:
+    vector<int> twoSum(vector<int>& nums, int target) {
+        for (int i = 0; i < nums.size(); i++) {
+            for (int j = i + 1; j < nums.size(); j++) {
+                if (nums[i] + nums[j] == target) {
+                    return {i, j};
+                }
+            }
+        }
+        return {};
+    }
+};

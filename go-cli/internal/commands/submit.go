@@ -175,6 +175,46 @@ func SubmitProblem(args []string, cfg *config.Config, ui UI) {
 	ui.WriteOutput(MsgError, "Timed out waiting for submission result.")
 }
 
+// recordLocalPass marks a problem solved in the tracker when all local example
+// test cases pass, without needing LeetCode cookies.
+func recordLocalPass(cfg *config.Config, ui UI, targetFile, content string) {
+	if cfg.BaseDir == "" {
+		return
+	}
+	slug := template.InferSlugFromPath(targetFile, content)
+	if slug == "" {
+		ui.WriteOutput(MsgInfo, "Progress not saved: could not infer problem slug.")
+		return
+	}
+	details, err := api.GetProblemDetails(slug)
+	if err != nil {
+		ui.WriteOutput(MsgInfo, "Progress not saved: could not fetch problem details (%v).", err)
+		return
+	}
+
+	prog := tracker.Load(cfg.BaseDir)
+	number := ""
+	title := details.Title
+	difficulty := details.Difficulty
+	category := template.DetectStructure(targetFile, cfg.GetDataStructures())
+
+	base := filepath.Base(targetFile)
+	re := regexp.MustCompile(`^(\d+)`)
+	if m := re.FindStringSubmatch(base); len(m) == 2 {
+		number = m[1]
+	}
+	if number == "" {
+		number = api.Slugify(title)
+	}
+
+	prog.Upsert(cfg.BaseDir, number, title, slug, difficulty, category, "solved", "", "")
+	if err := prog.Save(cfg.BaseDir); err != nil {
+		ui.WriteOutput(MsgError, "Warning: could not save progress: %v", err)
+		return
+	}
+	ui.WriteOutput(MsgSuccess, "Progress saved: %s marked as solved.", number)
+}
+
 // recordSubmission persists the result of a submit/test run into the progress tracker.
 func recordSubmission(cfg *config.Config, targetFile, slug string, details *api.ProblemDetail, runtime, memory string, accepted bool, ui UI) {
 	if cfg.BaseDir == "" {
