@@ -27,6 +27,11 @@ func main() {
 		args := os.Args[2:]
 
 		if handler, ok := commands.Registry[cmdName]; ok {
+			// Support `leet <cmd> --help` / `leet <cmd> -h`.
+			if wantsHelp(args) && cmdName != "help" && cmdName != "man" && cmdName != "--help" && cmdName != "-h" {
+				commands.Registry["help"]([]string{cmdName}, cfg, commands.HeadlessUI{})
+				return
+			}
 			handler(args, cfg, commands.HeadlessUI{})
 			return
 		}
@@ -43,4 +48,13 @@ func main() {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
 	}
+}
+
+func wantsHelp(args []string) bool {
+	for _, a := range args {
+		if a == "--help" || a == "-h" {
+			return true
+		}
+	}
+	return false
 }

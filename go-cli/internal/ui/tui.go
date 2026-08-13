@@ -485,7 +485,7 @@ func (m *Model) interactiveHelp() {
 	var cmdKeys []string
 
 	for _, c := range orderedCmds {
-		if doc, ok := CommandDocs[c]; ok {
+		if doc, ok := commands.CommandDocs[c]; ok {
 			label := fmt.Sprintf("%-18s - %s", c, doc.Summary)
 			choices = append(choices, label)
 			cmdKeys = append(cmdKeys, c)

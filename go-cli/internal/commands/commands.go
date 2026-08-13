@@ -55,6 +55,13 @@ var Registry = map[string]Handler{
 	"readme":            BuildReadme,
 	"build-readme":      BuildReadme,
 	"review":            ReviewQueue,
+	"version":           VersionCommand,
+	"--version":         VersionCommand,
+	"-v":                VersionCommand,
+	"help":              HelpCommand,
+	"man":               HelpCommand,
+	"--help":            HelpCommand,
+	"-h":                HelpCommand,
 }
 
 
