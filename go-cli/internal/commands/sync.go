@@ -15,6 +15,9 @@ import (
 func Sync(args []string, cfg *config.Config, ui UI) {
 	ui.WriteOutput(MsgPlain, "--- Sync LeetCode Workspace ---\n")
 
+	_, flags := parseFlags(args)
+	includeProgress := hasFlag(flags, "progress")
+
 	baseDir := cfg.BaseDir
 	if baseDir == "" {
 		ui.WriteOutput(MsgError, "Base directory not configured.")
@@ -53,6 +56,24 @@ func Sync(args []string, cfg *config.Config, ui UI) {
 		return
 	}
 
+	// .leet/ is git-ignored by default; --progress force-stages the tracker
+	// so solving history and the review schedule get backed up too.
+	if includeProgress {
+		progressPath := filepath.Join(baseDir, ".leet", "progress.json")
+		if _, err := os.Stat(progressPath); err == nil {
+			if out, err := runGit(baseDir, "add", "-f", ".leet/progress.json"); err != nil {
+				ui.WriteOutput(MsgError, "Failed to stage progress data: %v", err)
+				if out != "" {
+					ui.WriteOutput(MsgPlain, "%s", out)
+				}
+			} else {
+				ui.WriteOutput(MsgSuccess, "Including .leet/progress.json in this sync.")
+			}
+		} else {
+			ui.WriteOutput(MsgInfo, "No progress file found; skipping --progress.")
+		}
+	}
+
 	statusOut, _ := runGit(baseDir, "status", "--porcelain")
 	if strings.TrimSpace(statusOut) == "" {
 		ui.WriteOutput(MsgInfo, "No changes to sync. Workspace is up to date.")
@@ -71,7 +92,14 @@ func Sync(args []string, cfg *config.Config, ui UI) {
 	}
 
 	ui.WriteOutput(MsgInfo, "Pulling latest changes from remote (if any)...")
-	runGit(baseDir, "pull", "--rebase")
+	if out, err := runGit(baseDir, "pull", "--rebase"); err != nil {
+		ui.WriteOutput(MsgError, "Failed to pull from remote. Not pushing to avoid conflicts.")
+		if out != "" {
+			ui.WriteOutput(MsgPlain, "%s", out)
+		}
+		ui.WriteOutput(MsgInfo, "Resolve the issue (e.g. conflicts or missing upstream), then run 'leet sync' again.")
+		return
+	}
 
 	ui.WriteOutput(MsgInfo, "Pushing to remote...")
 	if out, err := runGit(baseDir, "push"); err != nil {
