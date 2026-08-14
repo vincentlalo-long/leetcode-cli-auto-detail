@@ -27,6 +27,17 @@ with Git.
 
 Requires [Go 1.25+](https://go.dev/dl/).
 
+**Install (Windows, one command):**
+
+```powershell
+powershell -ExecutionPolicy Bypass -File go-cli\build.ps1
+```
+
+This builds `leet.exe` into `%GOPATH%\bin` (already on your `PATH`), so the `leet`
+command works from any directory. Re-run it after pulling updates.
+
+Manual build alternative:
+
 ```bash
 cd go-cli
 go build -o leet.exe .
