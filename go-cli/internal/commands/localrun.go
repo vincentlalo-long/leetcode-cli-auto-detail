@@ -1,6 +1,7 @@
 package commands
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -8,6 +9,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"time"
 
 	"leetcli/internal/api"
 	"leetcli/internal/config"
@@ -300,9 +302,18 @@ func compileAndRun(langKey, dir, srcPath, payloadPath string) (string, error) {
 	return "", fmt.Errorf("local harness unsupported for %s", langKey)
 }
 
+// harnessTimeout bounds compile + run of the local test harness so a hung
+// solution (infinite loop) or a stuck compiler cannot block the CLI forever.
+const harnessTimeout = 120 * time.Second
+
 func runCmdOutput(name string, args ...string) (string, error) {
-	cmd := exec.Command(name, args...)
+	ctx, cancel := context.WithTimeout(context.Background(), harnessTimeout)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, name, args...)
 	cmd.Stdin = os.Stdin
 	out, err := cmd.CombinedOutput()
+	if ctx.Err() == context.DeadlineExceeded {
+		return string(out), fmt.Errorf("timed out after %s", harnessTimeout)
+	}
 	return string(out), err
 }
