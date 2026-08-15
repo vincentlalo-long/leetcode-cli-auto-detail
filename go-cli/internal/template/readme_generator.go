@@ -126,6 +126,14 @@ func GenerateRootReadme(baseDir string, cfg *config.Config) (string, int, error)
 	content := buildReadmeMarkdown(entries)
 
 	readmePath := filepath.Join(absBase, "README.md")
+
+	// Skip the write when nothing changed. This avoids pointless git churn
+	// (and mtime updates) when `leet sync`/`readme` is re-run without any real
+	// workspace changes.
+	if old, err := os.ReadFile(readmePath); err == nil && string(old) == content {
+		return readmePath, len(entries), nil
+	}
+
 	err = os.WriteFile(readmePath, []byte(content), 0644)
 	if err != nil {
 		return "", 0, err
@@ -249,7 +257,7 @@ func buildReadmeMarkdown(entries []*ProblemEntry) string {
 		}
 	}
 
-	now := time.Now().Format("2006-01-02 15:04:05")
+	now := time.Now().Format("2006-01-02")
 
 	var sb strings.Builder
 	sb.WriteString("# 🧩 LeetCode Solutions Index\n\n")
