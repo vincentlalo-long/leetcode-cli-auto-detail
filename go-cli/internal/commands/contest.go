@@ -1,25 +1,26 @@
 package commands
 
 import (
+	"fmt"
 	"time"
 
 	"leetcli/internal/api"
 	"leetcli/internal/config"
 )
 
-func Contest(args []string, cfg *config.Config, ui UI) {
+func Contest(args []string, cfg *config.Config, ui UI) error {
 	ui.WriteOutput(MsgPlain, "--- Upcoming LeetCode Contests ---\n")
 
 	ui.WriteOutput(MsgInfo, "Fetching contest information...")
 	contests, err := api.GetUpcomingContests()
 	if err != nil {
 		ui.WriteOutput(MsgError, "Could not fetch contest information.")
-		return
+		return fmt.Errorf("could not fetch contest information: %w", err)
 	}
 
 	if len(contests) == 0 {
 		ui.WriteOutput(MsgInfo, "No upcoming contests found.")
-		return
+		return nil
 	}
 
 	ui.WriteOutput(MsgPlain, "Upcoming Contests:")
@@ -33,4 +34,5 @@ func Contest(args []string, cfg *config.Config, ui UI) {
 		ui.WriteOutput(MsgInfo, "    Duration: %.0f hours", durationHours)
 		ui.WriteOutput(MsgInfo, "    Link: %s", link)
 	}
+	return nil
 }

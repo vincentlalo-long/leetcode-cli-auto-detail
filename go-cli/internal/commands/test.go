@@ -1,6 +1,7 @@
 package commands
 
 import (
+	"fmt"
 	"path/filepath"
 	"strings"
 	"time"
@@ -10,7 +11,7 @@ import (
 	"leetcli/internal/template"
 )
 
-func TestProblem(args []string, cfg *config.Config, ui UI) {
+func TestProblem(args []string, cfg *config.Config, ui UI) error {
 	ui.WriteOutput(MsgPlain, "--- LeetCode Test ---\n")
 
 	problemNum := ""
@@ -21,18 +22,18 @@ func TestProblem(args []string, cfg *config.Config, ui UI) {
 		problemNum = ui.PromptText("Enter problem number to test")
 	}
 	if problemNum == "" {
-		return
+		return fmt.Errorf("problem number is required")
 	}
 
 	baseDir := cfg.BaseDir
 	if baseDir == "" {
 		ui.WriteOutput(MsgError, "Invalid base directory in config")
-		return
+		return fmt.Errorf("invalid base directory in config")
 	}
 
 	targetFile, content := resolveLocalSolution(baseDir, problemNum, cfg, ui)
 	if targetFile == "" {
-		return
+		return fmt.Errorf("could not find local file for problem %s", problemNum)
 	}
 
 	// Local (cookie-free) harness mode: leet test <num> --local
@@ -41,8 +42,9 @@ func TestProblem(args []string, cfg *config.Config, ui UI) {
 		passed := runLocalHarness(cfg, ui, targetFile, content, "")
 		if passed {
 			recordLocalPass(cfg, ui, targetFile, content)
+			return nil
 		}
-		return
+		return fmt.Errorf("local test cases failed for problem %s", problemNum)
 	}
 	_ = pos
 
@@ -54,27 +56,27 @@ func TestProblem(args []string, cfg *config.Config, ui UI) {
 	langKey := template.GetLanguageByExtension(languages, ext)
 	if langKey == "" {
 		ui.WriteOutput(MsgError, "Unsupported file extension for testing.")
-		return
+		return fmt.Errorf("unsupported file extension for testing")
 	}
 
 	lcLang, ok := template.LeetCodeLangMap[langKey]
 	if !ok {
 		ui.WriteOutput(MsgError, "Language '%s' is not supported by LeetCode API.", langKey)
-		return
+		return fmt.Errorf("language '%s' is not supported by LeetCode API", langKey)
 	}
 
 	slug := template.InferSlugFromPath(targetFile, content)
 	if slug == "" {
 		slug = ui.PromptText("Enter LeetCode problem slug (e.g., two-sum)")
 		if slug == "" {
-			return
+			return fmt.Errorf("problem slug is required")
 		}
 	}
 
 	details, err := api.GetProblemDetails(slug)
 	if err != nil {
 		ui.WriteOutput(MsgError, "Could not fetch problem details from LeetCode: %v", err)
-		return
+		return fmt.Errorf("could not fetch problem details: %w", err)
 	}
 
 	session := cfg.GetLeetcodeSession()
@@ -82,7 +84,7 @@ func TestProblem(args []string, cfg *config.Config, ui UI) {
 	if session == "" || csrf == "" {
 		ui.WriteOutput(MsgError, "LeetCode test requires leetcode_session and leetcode_csrf.")
 		ui.WriteOutput(MsgInfo, "Set them in config.local.json or use LEETCODE_SESSION / LEETCODE_CSRF env vars.")
-		return
+		return fmt.Errorf("leetcode_session and leetcode_csrf are required")
 	}
 
 	ui.WriteOutput(MsgInfo, "Fetching example testcases for slug: %s...", slug)
@@ -91,7 +93,7 @@ func TestProblem(args []string, cfg *config.Config, ui UI) {
 		ui.WriteOutput(MsgInfo, "Could not fetch sample testcases automatically.")
 		testcases = ui.PromptText("Enter custom input testcases")
 		if testcases == "" {
-			return
+			return fmt.Errorf("no testcases provided")
 		}
 	} else {
 		ui.WriteOutput(MsgSuccess, "Sample testcases fetched.")
@@ -101,7 +103,7 @@ func TestProblem(args []string, cfg *config.Config, ui UI) {
 	interpretID, err := api.InterpretSolution(session, csrf, slug, details.QuestionID, lcLang, content, testcases)
 	if err != nil {
 		ui.WriteOutput(MsgError, "Test run request failed: %v", err)
-		return
+		return fmt.Errorf("test run request failed: %w", err)
 	}
 
 	ui.WriteOutput(MsgInfo, "Test Run ID: %s. Polling for results...", interpretID)
@@ -156,9 +158,11 @@ func TestProblem(args []string, cfg *config.Config, ui UI) {
 				}
 				ui.WriteOutput(MsgError, "Runtime Error:\n%s", errMsg)
 			}
+			return fmt.Errorf("test failed: %s", res.StatusMsg)
 		}
-		return
+		return nil
 	}
 
 	ui.WriteOutput(MsgError, "Timed out waiting for test run result.")
+	return fmt.Errorf("timed out waiting for test run result")
 }

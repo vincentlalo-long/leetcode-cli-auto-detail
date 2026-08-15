@@ -3,7 +3,6 @@ package commands
 import (
 	"fmt"
 	"os"
-	"path/filepath"
 	"regexp"
 	"sort"
 	"strings"
@@ -12,7 +11,7 @@ import (
 	"leetcli/internal/template"
 )
 
-func SearchProblems(args []string, cfg *config.Config, ui UI) {
+func SearchProblems(args []string, cfg *config.Config, ui UI) error {
 	ui.WriteOutput(MsgPlain, "--- Search Problems ---\n")
 
 	baseDir := cfg.BaseDir
@@ -20,7 +19,7 @@ func SearchProblems(args []string, cfg *config.Config, ui UI) {
 
 	if _, err := os.Stat(baseDir); os.IsNotExist(err) {
 		ui.WriteOutput(MsgError, "Base directory not found: %s", baseDir)
-		return
+		return fmt.Errorf("base directory not found: %s", baseDir)
 	}
 
 	query := ""
@@ -32,7 +31,7 @@ func SearchProblems(args []string, cfg *config.Config, ui UI) {
 	}
 	if strings.TrimSpace(query) == "" {
 		ui.WriteOutput(MsgError, "Search query cannot be empty.")
-		return
+		return fmt.Errorf("search query cannot be empty")
 	}
 
 	languages := template.NormalizeLanguages(nil)
@@ -47,28 +46,26 @@ func SearchProblems(args []string, cfg *config.Config, ui UI) {
 	allProblems := collectProblems(baseDir, dataStructures, exts)
 	if len(allProblems) == 0 {
 		ui.WriteOutput(MsgError, "No problems found in the base directory.")
-		return
+		return fmt.Errorf("no problems found in the base directory")
 	}
 
 	results := searchProblems(allProblems, query)
 
 	if len(results) == 0 {
 		ui.WriteOutput(MsgError, "No problems found matching your search.")
-		return
+		return fmt.Errorf("no problems found matching your search")
 	}
 
 	ui.WriteOutput(MsgInfo, "Found %d problem(s):\n", len(results))
 	for _, r := range results {
 		status := "unsolved"
-		statusColor := "red"
 		if r.Solutions > 0 {
 			status = "solved"
-			statusColor = "green"
 		}
 		line := fmt.Sprintf("  %-40s [%s] (%s)", r.FileName, status, r.Structure)
-		_ = statusColor
 		ui.WriteOutput(MsgPlain, line)
 	}
+	return nil
 }
 
 func searchProblems(records []ProblemRecord, query string) []ProblemRecord {
@@ -109,5 +106,3 @@ func searchProblems(records []ProblemRecord, query string) []ProblemRecord {
 
 	return results
 }
-
-var _ = filepath.Base

@@ -3,24 +3,25 @@ package commands
 import (
 	"fmt"
 	"os/exec"
-	"runtime"
 	"strings"
 
 	"leetcli/internal/config"
 	"leetcli/internal/template"
 )
 
-func ManageConfig(args []string, cfg *config.Config, ui UI) {
+func ManageConfig(args []string, cfg *config.Config, ui UI) error {
 	ui.WriteOutput(MsgPlain, "--- CLI Configuration Manager ---\n")
 
 	if len(args) > 0 {
 		switch args[0] {
 		case "show":
 			showConfig(cfg, ui)
-			return
+			return nil
 		case "open":
-			openConfig(cfg, ui)
-			return
+			if err := openConfig(cfg, ui); err != nil {
+				return err
+			}
+			return nil
 		}
 	}
 
@@ -36,7 +37,7 @@ func ManageConfig(args []string, cfg *config.Config, ui UI) {
 
 	selected := ui.PromptSelect("Select config option to edit (or Esc/Ctrl+C to cancel):", choices)
 	if selected == "" {
-		return
+		return nil
 	}
 
 	switch {
@@ -46,9 +47,9 @@ func ManageConfig(args []string, cfg *config.Config, ui UI) {
 			cfg.BaseDir = newDir
 			if err := cfg.Save(); err != nil {
 				ui.WriteOutput(MsgError, "Failed to save config: %v", err)
-			} else {
-				ui.WriteOutput(MsgSuccess, "Updated base_dir to: %s", cfg.BaseDir)
+				return fmt.Errorf("failed to save config: %w", err)
 			}
+			ui.WriteOutput(MsgSuccess, "Updated base_dir to: %s", cfg.BaseDir)
 		}
 
 	case strings.HasPrefix(selected, "2."):
@@ -63,9 +64,9 @@ func ManageConfig(args []string, cfg *config.Config, ui UI) {
 			cfg.DefaultLanguage = langKey
 			if err := cfg.Save(); err != nil {
 				ui.WriteOutput(MsgError, "Failed to save config: %v", err)
-			} else {
-				ui.WriteOutput(MsgSuccess, "Updated default_language to: %s", cfg.DefaultLanguage)
+				return fmt.Errorf("failed to save config: %w", err)
 			}
+			ui.WriteOutput(MsgSuccess, "Updated default_language to: %s", cfg.DefaultLanguage)
 		}
 
 	case strings.HasPrefix(selected, "3."):
@@ -90,9 +91,9 @@ func ManageConfig(args []string, cfg *config.Config, ui UI) {
 				cfg.SetEditor(newEditor)
 				if err := cfg.Save(); err != nil {
 					ui.WriteOutput(MsgError, "Failed to save config: %v", err)
-				} else {
-					ui.WriteOutput(MsgSuccess, "Updated editor to: %s", cfg.GetEditor())
+					return fmt.Errorf("failed to save config: %w", err)
 				}
+				ui.WriteOutput(MsgSuccess, "Updated editor to: %s", cfg.GetEditor())
 			}
 		}
 
@@ -103,9 +104,9 @@ func ManageConfig(args []string, cfg *config.Config, ui UI) {
 			cfg.LeetcodeSession = strings.TrimSpace(session)
 			if err := cfg.Save(); err != nil {
 				ui.WriteOutput(MsgError, "Failed to save config: %v", err)
-			} else {
-				ui.WriteOutput(MsgSuccess, "Updated leetcode_session cookie (stored in %s).", cfg.GetPath())
+				return fmt.Errorf("failed to save config: %w", err)
 			}
+			ui.WriteOutput(MsgSuccess, "Updated leetcode_session cookie (stored in %s).", cfg.GetPath())
 		}
 
 	case strings.HasPrefix(selected, "5."):
@@ -115,17 +116,20 @@ func ManageConfig(args []string, cfg *config.Config, ui UI) {
 			cfg.LeetcodeCsrf = strings.TrimSpace(csrf)
 			if err := cfg.Save(); err != nil {
 				ui.WriteOutput(MsgError, "Failed to save config: %v", err)
-			} else {
-				ui.WriteOutput(MsgSuccess, "Updated leetcode_csrf token (stored in %s).", cfg.GetPath())
+				return fmt.Errorf("failed to save config: %w", err)
 			}
+			ui.WriteOutput(MsgSuccess, "Updated leetcode_csrf token (stored in %s).", cfg.GetPath())
 		}
 
 	case strings.HasPrefix(selected, "6."):
-		openConfig(cfg, ui)
+		if err := openConfig(cfg, ui); err != nil {
+			return err
+		}
 
 	case strings.HasPrefix(selected, "7."):
 		showConfig(cfg, ui)
 	}
+	return nil
 }
 
 func showConfig(cfg *config.Config, ui UI) {
@@ -140,24 +144,19 @@ func showConfig(cfg *config.Config, ui UI) {
 	ui.WriteOutput(MsgPlain, "=============================\n")
 }
 
-func openConfig(cfg *config.Config, ui UI) {
+func openConfig(cfg *config.Config, ui UI) error {
 	editor := cfg.GetEditor()
 	configPath := cfg.GetPath()
 	ui.WriteOutput(MsgInfo, "Opening %s in editor (%s)...", configPath, editor)
 
-	var cmd *exec.Cmd
-	if runtime.GOOS == "windows" {
-		cmd = exec.Command("cmd", "/c", "start", "", editor, configPath)
-	} else {
-		cmd = exec.Command(editor, configPath)
-	}
-
+	cmd := exec.Command(editor, configPath)
 	if err := cmd.Start(); err != nil {
 		ui.WriteOutput(MsgError, "Failed to launch editor '%s': %v", editor, err)
 		ui.WriteOutput(MsgInfo, "Config file location: %s", configPath)
-		return
+		return fmt.Errorf("failed to launch editor '%s': %w", editor, err)
 	}
 	ui.WriteOutput(MsgSuccess, "Config file opened in editor!")
+	return nil
 }
 
 func maskSecret(s string) string {

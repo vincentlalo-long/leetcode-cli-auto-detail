@@ -1,6 +1,7 @@
 package commands
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -12,7 +13,7 @@ import (
 	"leetcli/internal/tracker"
 )
 
-func SubmitProblem(args []string, cfg *config.Config, ui UI) {
+func SubmitProblem(args []string, cfg *config.Config, ui UI) error {
 	ui.WriteOutput(MsgPlain, "--- LeetCode Submit ---\n")
 
 	problemNum := ""
@@ -23,13 +24,13 @@ func SubmitProblem(args []string, cfg *config.Config, ui UI) {
 		problemNum = ui.PromptText("Enter problem number to submit")
 	}
 	if problemNum == "" {
-		return
+		return fmt.Errorf("problem number is required")
 	}
 
 	baseDir := cfg.BaseDir
 	if baseDir == "" {
 		ui.WriteOutput(MsgError, "Invalid base directory in config")
-		return
+		return fmt.Errorf("invalid base directory in config")
 	}
 
 	ui.WriteOutput(MsgInfo, "Searching for problem...")
@@ -53,7 +54,7 @@ func SubmitProblem(args []string, cfg *config.Config, ui UI) {
 
 	if len(matches) == 0 {
 		ui.WriteOutput(MsgError, "Could not find local file for problem %s.", problemNum)
-		return
+		return fmt.Errorf("could not find local file for problem %s", problemNum)
 	}
 
 	targetFile := matches[0]
@@ -74,7 +75,7 @@ func SubmitProblem(args []string, cfg *config.Config, ui UI) {
 	contentBytes, err := os.ReadFile(targetFile)
 	if err != nil {
 		ui.WriteOutput(MsgError, "Failed to read file: %v", err)
-		return
+		return fmt.Errorf("failed to read file: %w", err)
 	}
 	content := string(contentBytes)
 
@@ -82,27 +83,27 @@ func SubmitProblem(args []string, cfg *config.Config, ui UI) {
 	langKey := template.GetLanguageByExtension(languages, ext)
 	if langKey == "" {
 		ui.WriteOutput(MsgError, "Unsupported file extension for submission.")
-		return
+		return fmt.Errorf("unsupported file extension for submission")
 	}
 
 	lcLang, ok := template.LeetCodeLangMap[langKey]
 	if !ok {
 		ui.WriteOutput(MsgError, "Language '%s' is not supported by LeetCode API.", langKey)
-		return
+		return fmt.Errorf("language '%s' is not supported by LeetCode API", langKey)
 	}
 
 	slug := template.InferSlugFromPath(targetFile, content)
 	if slug == "" {
 		slug = ui.PromptText("Enter LeetCode problem slug (e.g., two-sum)")
 		if slug == "" {
-			return
+			return fmt.Errorf("problem slug is required")
 		}
 	}
 
 	details, err := api.GetProblemDetails(slug)
 	if err != nil {
 		ui.WriteOutput(MsgError, "Could not fetch problem details from LeetCode: %v", err)
-		return
+		return fmt.Errorf("could not fetch problem details: %w", err)
 	}
 
 	session := cfg.GetLeetcodeSession()
@@ -110,14 +111,14 @@ func SubmitProblem(args []string, cfg *config.Config, ui UI) {
 	if session == "" || csrf == "" {
 		ui.WriteOutput(MsgError, "LeetCode submit requires leetcode_session and leetcode_csrf.")
 		ui.WriteOutput(MsgInfo, "Set them in config.local.json or use LEETCODE_SESSION / LEETCODE_CSRF env vars.")
-		return
+		return fmt.Errorf("leetcode_session and leetcode_csrf are required")
 	}
 
 	ui.WriteOutput(MsgInfo, "Submitting %s solution to LeetCode (slug: %s)...", lcLang, slug)
 	subID, err := api.SubmitSolution(session, csrf, slug, details.QuestionID, lcLang, content)
 	if err != nil {
 		ui.WriteOutput(MsgError, "Submission failed: %v", err)
-		return
+		return fmt.Errorf("submission failed: %w", err)
 	}
 
 	ui.WriteOutput(MsgInfo, "Submission ID: %s. Polling for results...", subID)
@@ -149,6 +150,7 @@ func SubmitProblem(args []string, cfg *config.Config, ui UI) {
 				ui.WriteOutput(MsgPlain, "  Testcases: %d / %d", res.TotalCorrect, res.TotalTestcases)
 			}
 			recordSubmission(cfg, targetFile, slug, details, runtime, memory, true, ui)
+			return nil
 		} else {
 			ui.WriteOutput(MsgError, "✘ Result: %s", res.StatusMsg)
 			if res.TotalTestcases > 0 {
@@ -168,11 +170,13 @@ func SubmitProblem(args []string, cfg *config.Config, ui UI) {
 				}
 				ui.WriteOutput(MsgError, "Runtime Error:\n%s", errMsg)
 			}
+			recordSubmission(cfg, targetFile, slug, details, "", "", false, ui)
+			return fmt.Errorf("submission not accepted: %s", res.StatusMsg)
 		}
-		return
 	}
 
 	ui.WriteOutput(MsgError, "Timed out waiting for submission result.")
+	return fmt.Errorf("timed out waiting for submission result")
 }
 
 // recordLocalPass marks a problem solved in the tracker when all local example

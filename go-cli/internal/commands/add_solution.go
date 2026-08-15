@@ -5,13 +5,12 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime"
 
 	"leetcli/internal/config"
 	"leetcli/internal/template"
 )
 
-func AddSolution(args []string, cfg *config.Config, ui UI) {
+func AddSolution(args []string, cfg *config.Config, ui UI) error {
 	ui.WriteOutput(MsgPlain, "--- Add New Solution ---\n")
 
 	languages := template.NormalizeLanguages(nil)
@@ -27,7 +26,7 @@ func AddSolution(args []string, cfg *config.Config, ui UI) {
 	files := template.GetAllSolutionFiles(cfg.BaseDir, exts)
 	if len(files) == 0 {
 		ui.WriteOutput(MsgError, "No problem files found in workspace!")
-		return
+		return fmt.Errorf("no problem files found in workspace")
 	}
 
 	fileNames := make([]string, len(files))
@@ -37,7 +36,7 @@ func AddSolution(args []string, cfg *config.Config, ui UI) {
 
 	selected := ui.PromptSelect("Select problem file to add solution", fileNames)
 	if selected == "" {
-		return
+		return nil
 	}
 
 	var filePath string
@@ -48,13 +47,13 @@ func AddSolution(args []string, cfg *config.Config, ui UI) {
 		}
 	}
 	if filePath == "" {
-		return
+		return nil
 	}
 
 	contentBytes, err := os.ReadFile(filePath)
 	if err != nil {
 		ui.WriteOutput(MsgError, "Failed to read file: %v", err)
-		return
+		return fmt.Errorf("failed to read file: %w", err)
 	}
 	content := string(contentBytes)
 
@@ -90,32 +89,30 @@ func AddSolution(args []string, cfg *config.Config, ui UI) {
 	f, err := os.OpenFile(filePath, os.O_APPEND|os.O_WRONLY, 0644)
 	if err != nil {
 		ui.WriteOutput(MsgError, "Failed to open file: %v", err)
-		return
+		return fmt.Errorf("failed to open file: %w", err)
 	}
 	if _, err := f.WriteString(block); err != nil {
 		f.Close()
 		ui.WriteOutput(MsgError, "Failed to write solution block: %v", err)
-		return
+		return fmt.Errorf("failed to write solution block: %w", err)
 	}
-	f.Close()
+	if err := f.Close(); err != nil {
+		ui.WriteOutput(MsgError, "Failed to close file: %v", err)
+		return fmt.Errorf("failed to close file: %w", err)
+	}
 
 	ui.WriteOutput(MsgSuccess, fmt.Sprintf("Added Solution %d template to %s", solNum, filepath.Base(filePath)))
 
 	editor := cfg.GetEditor()
 	ui.WriteOutput(MsgInfo, "Opening %s in editor (%s)...", filepath.Base(filePath), editor)
 
-	var cmd *exec.Cmd
-	if runtime.GOOS == "windows" {
-		cmd = exec.Command("cmd", "/c", "start", "", editor, filePath)
-	} else {
-		cmd = exec.Command(editor, filePath)
-	}
-
+	cmd := exec.Command(editor, filePath)
 	if err := cmd.Start(); err != nil {
 		ui.WriteOutput(MsgError, "Failed to launch editor '%s': %v", editor, err)
 		ui.WriteOutput(MsgInfo, "File path: %s", filePath)
-		return
+		return fmt.Errorf("failed to launch editor '%s': %w", editor, err)
 	}
 
 	ui.WriteOutput(MsgSuccess, "Opened file in editor! You can now write or paste your solution code there.")
+	return nil
 }

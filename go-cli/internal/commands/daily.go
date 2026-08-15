@@ -11,7 +11,7 @@ import (
 	"leetcli/internal/template"
 )
 
-func Daily(args []string, cfg *config.Config, ui UI) {
+func Daily(args []string, cfg *config.Config, ui UI) error {
 	ui.WriteOutput(MsgPlain, "--- LeetCode Daily Challenge ---\n")
 
 	_, flags := parseFlags(args)
@@ -21,11 +21,11 @@ func Daily(args []string, cfg *config.Config, ui UI) {
 	detail, _, _, err := api.GetDailyChallenge()
 	if err != nil {
 		ui.WriteOutput(MsgError, "Could not fetch daily challenge: %v", err)
-		return
+		return fmt.Errorf("could not fetch daily challenge: %w", err)
 	}
 	if detail == nil {
 		ui.WriteOutput(MsgError, "Could not fetch daily challenge. Please check your connection.")
-		return
+		return fmt.Errorf("could not fetch daily challenge")
 	}
 
 	problemNum := detail.QuestionFrontendID
@@ -67,14 +67,10 @@ func Daily(args []string, cfg *config.Config, ui UI) {
 		addIt = ui.PromptConfirm("Add this problem to your workspace?")
 	}
 	if !addIt {
-		return
+		return nil
 	}
 
 	dataStructures := cfg.GetDataStructures()
-	if len(dataStructures) == 0 {
-		ui.WriteOutput(MsgError, "No data structures found. Add one first!")
-		return
-	}
 
 	dsChoices := []string{"[Uncategorized]"}
 	for k := range dataStructures {
@@ -89,18 +85,24 @@ func Daily(args []string, cfg *config.Config, ui UI) {
 	if selected == "" {
 		selected = ui.PromptSelect("Select data structure", dsChoices)
 	}
+	if selected == "" {
+		return nil
+	}
 	if selected == "Add new data structure" {
 		name := ui.PromptText("Data structure name (e.g., tree)")
 		folder := name
 		if folder == "" {
-			return
+			return nil
 		}
 		folderInput := ui.PromptText(fmt.Sprintf("Folder name (press Enter for '%s')", name))
 		if folderInput != "" {
 			folder = folderInput
 		}
 		if cfg.AddDataStructure(name, folder) {
-			cfg.Save()
+			if err := cfg.Save(); err != nil {
+				ui.WriteOutput(MsgError, "Failed to save config: %v", err)
+				return fmt.Errorf("failed to save config: %w", err)
+			}
 			ui.WriteOutput(MsgSuccess, "Added data structure: %s -> %s", name, folder)
 		}
 		dataStructures = cfg.GetDataStructures()
@@ -109,6 +111,9 @@ func Daily(args []string, cfg *config.Config, ui UI) {
 			dsChoices = append(dsChoices, k)
 		}
 		selected = ui.PromptSelect("Select data structure", dsChoices)
+		if selected == "" {
+			return nil
+		}
 	}
 
 	dsFolder := "uncategorized"
@@ -140,21 +145,30 @@ func Daily(args []string, cfg *config.Config, ui UI) {
 	problemDir, err := template.CreateProblemDirectory(cfg.BaseDir, dsFolder, folderName)
 	if err != nil {
 		ui.WriteOutput(MsgError, "Failed to create directory: %v", err)
-		return
+		return fmt.Errorf("failed to create directory: %w", err)
 	}
 
-	problemFile := filepath.Join(problemDir, fmt.Sprintf("%s_%s.%s", problemNum, problemName, langExt))
+	safeName := template.SanitizeFileName(problemName)
+	if safeName == "" {
+		safeName = slug
+	}
+	problemFile := filepath.Join(problemDir, fmt.Sprintf("%s_%s.%s", problemNum, safeName, langExt))
 	if _, err := os.Stat(problemFile); err == nil {
 		ui.WriteOutput(MsgError, "Problem file already exists!")
-		return
+		return fmt.Errorf("problem file already exists")
 	}
 
 	content := template.BuildProblemTemplate(langKey, problemNum, problemName, leetLink,
 		difficulty, tagsStr, selected)
-	os.WriteFile(problemFile, []byte(content), 0644)
+	if err := os.WriteFile(problemFile, []byte(content), 0644); err != nil {
+		ui.WriteOutput(MsgError, "Failed to write file: %v", err)
+		return fmt.Errorf("failed to write file: %w", err)
+	}
 
-	details, _ := api.GetProblemDetails(slug)
-	if details != nil && details.Content != "" {
+	details, err := api.GetProblemDetails(slug)
+	if err != nil {
+		ui.WriteOutput(MsgInfo, "Could not fetch problem description (using basic template).")
+	} else if details != nil && details.Content != "" {
 		readmePath := filepath.Join(problemDir, "README.md")
 		mdContent := template.FormatDescriptionMarkdown(details.Content)
 		cleanNum := strings.TrimLeft(problemNum, "0")
@@ -163,10 +177,14 @@ func Daily(args []string, cfg *config.Config, ui UI) {
 		}
 		readmeContent := template.MakeReadmeContent(cleanNum, problemName, leetLink,
 			difficulty, tagsStr, mdContent)
-		os.WriteFile(readmePath, []byte(readmeContent), 0644)
+		if err := os.WriteFile(readmePath, []byte(readmeContent), 0644); err != nil {
+			ui.WriteOutput(MsgError, "Failed to write README.md: %v", err)
+			return fmt.Errorf("failed to write README.md: %w", err)
+		}
 		ui.WriteOutput(MsgSuccess, "Saved problem description to README.md")
 	}
 
 	ui.WriteOutput(MsgSuccess, "Created problem directory and files")
 	ui.WriteOutput(MsgInfo, "Path: %s", problemFile)
+	return nil
 }

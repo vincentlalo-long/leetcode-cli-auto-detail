@@ -1,17 +1,16 @@
 package commands
 
 import (
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime"
-	"strings"
 
 	"leetcli/internal/config"
 	"leetcli/internal/template"
 )
 
-func OpenProblem(args []string, cfg *config.Config, ui UI) {
+func OpenProblem(args []string, cfg *config.Config, ui UI) error {
 	ui.WriteOutput(MsgPlain, "--- Open Problem ---\n")
 
 	problemNum := ""
@@ -22,17 +21,17 @@ func OpenProblem(args []string, cfg *config.Config, ui UI) {
 		problemNum = ui.PromptText("Enter problem number to open")
 	}
 	if problemNum == "" {
-		return
+		return fmt.Errorf("problem number is required")
 	}
 
 	baseDir := cfg.BaseDir
 	if baseDir == "" {
 		ui.WriteOutput(MsgError, "Invalid base directory in config")
-		return
+		return fmt.Errorf("invalid base directory in config")
 	}
 	if _, err := os.Stat(baseDir); os.IsNotExist(err) {
 		ui.WriteOutput(MsgError, "Base directory does not exist: %s", baseDir)
-		return
+		return fmt.Errorf("base directory does not exist: %s", baseDir)
 	}
 
 	ui.WriteOutput(MsgInfo, "Searching for problem...")
@@ -57,7 +56,7 @@ func OpenProblem(args []string, cfg *config.Config, ui UI) {
 	if len(matches) == 0 {
 		ui.WriteOutput(MsgError, "Could not find local file for problem %s.", problemNum)
 		ui.WriteOutput(MsgInfo, "Try running 'add' or 'daily' first.")
-		return
+		return fmt.Errorf("could not find local file for problem %s", problemNum)
 	}
 
 	targetFile := matches[0]
@@ -89,21 +88,13 @@ func OpenProblem(args []string, cfg *config.Config, ui UI) {
 	}
 
 	editor := cfg.GetEditor()
-	if editor == "code" {
-		editor = "code"
-	}
-
 	ui.WriteOutput(MsgInfo, "Opening with %s...", editor)
 	cmd := exec.Command(editor, targetFile)
-	if runtime.GOOS == "windows" {
-		cmd = exec.Command("cmd", "/c", "start", "", editor, targetFile)
-	}
 	if err := cmd.Start(); err != nil {
 		ui.WriteOutput(MsgError, "Failed to open editor '%s': %v", editor, err)
 		ui.WriteOutput(MsgInfo, "You can manually open: %s", targetFile)
-		return
+		return fmt.Errorf("failed to open editor '%s': %w", editor, err)
 	}
 	ui.WriteOutput(MsgSuccess, "Problem opened in editor!")
+	return nil
 }
-
-var _ = strings.Join

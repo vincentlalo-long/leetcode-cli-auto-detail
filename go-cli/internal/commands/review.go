@@ -21,17 +21,17 @@ import (
 //	review <num>          -> mark a problem as reviewed
 //	review --solve <num>  -> mark a problem solved
 //	review --unsolve <num>-> mark a problem unsolved
-func ReviewQueue(args []string, cfg *config.Config, ui UI) {
+func ReviewQueue(args []string, cfg *config.Config, ui UI) error {
 	ui.WriteOutput(MsgPlain, "--- Review Queue ---\n")
 
 	baseDir := cfg.BaseDir
 	if baseDir == "" {
 		ui.WriteOutput(MsgError, "Missing 'base_dir' in config")
-		return
+		return fmt.Errorf("missing 'base_dir' in config")
 	}
 	if _, err := os.Stat(baseDir); os.IsNotExist(err) {
 		ui.WriteOutput(MsgError, "Base directory does not exist: %s", baseDir)
-		return
+		return fmt.Errorf("base directory does not exist: %s", baseDir)
 	}
 
 	pos, flags := parseFlags(args)
@@ -49,20 +49,20 @@ func ReviewQueue(args []string, cfg *config.Config, ui UI) {
 		solved := hasFlag(flags, "solve")
 		if num == "" {
 			ui.WriteOutput(MsgError, "Specify a problem number: review --solve 1")
-			return
+			return fmt.Errorf("specify a problem number: review --solve 1")
 		}
 		title, difficulty := lookupProblemInfo(baseDir, num)
 		prog.SetStatus(num, title, difficulty, solved)
 		if err := prog.Save(baseDir); err != nil {
 			ui.WriteOutput(MsgError, "Failed to save progress: %v", err)
-			return
+			return fmt.Errorf("failed to save progress: %w", err)
 		}
 		state := "unsolved"
 		if solved {
 			state = "solved"
 		}
 		ui.WriteOutput(MsgSuccess, "Problem %s marked as %s.", num, state)
-		return
+		return nil
 	}
 
 	// Mark a specific problem as reviewed.
@@ -70,15 +70,15 @@ func ReviewQueue(args []string, cfg *config.Config, ui UI) {
 		num := pos[0]
 		if !prog.MarkReviewed(num) {
 			ui.WriteOutput(MsgError, "Problem %s is not in the progress tracker. Mark it solved first (review --solve %s).", num, num)
-			return
+			return fmt.Errorf("problem %s is not in the progress tracker", num)
 		}
 		if err := prog.Save(baseDir); err != nil {
 			ui.WriteOutput(MsgError, "Failed to save progress: %v", err)
-			return
+			return fmt.Errorf("failed to save progress: %w", err)
 		}
 		ui.WriteOutput(MsgSuccess, "Problem %s marked as reviewed!", num)
 		showNextReview(ui, prog, num)
-		return
+		return nil
 	}
 
 	due := prog.DueReviews()
@@ -87,7 +87,7 @@ func ReviewQueue(args []string, cfg *config.Config, ui UI) {
 		entries := prog.All()
 		if len(entries) == 0 {
 			ui.WriteOutput(MsgInfo, "No tracked problems yet. Use 'submit' or 'review --solve' to add some.")
-			return
+			return nil
 		}
 		today := time.Now().Format("2006-01-02")
 		ui.WriteOutput(MsgPlain, "\nTracked problems:")
@@ -102,27 +102,27 @@ func ReviewQueue(args []string, cfg *config.Config, ui UI) {
 				ui.WriteOutput(MsgPlain, "       Last reviewed: %s | Next: %s", orDash(e.LastReviewed), orDash(e.NextReview))
 			}
 		}
-		return
+		return nil
 	}
 
 	if hasFlag(flags, "due") {
 		if len(due) == 0 {
 			ui.WriteOutput(MsgSuccess, "No reviews due. Great job! 🎉")
-			return
+			return nil
 		}
 		ui.WriteOutput(MsgPlain, "\nDue for review (%d):", len(due))
 		for _, e := range due {
 			ui.WriteOutput(MsgPlain, "  %s. %s (%s)", e.Number, e.Title, e.Difficulty)
 		}
 		ui.WriteOutput(MsgInfo, "To mark reviewed: review <number>")
-		return
+		return nil
 	}
 
 	// Interactive flow.
 	if len(due) == 0 {
 		ui.WriteOutput(MsgSuccess, "No reviews due right now. Come back later!")
 		ui.WriteOutput(MsgInfo, "Use 'review --list' to see all tracked problems.")
-		return
+		return nil
 	}
 
 	ui.WriteOutput(MsgPlain, "\nProblems due for review (%d):", len(due))
@@ -133,7 +133,7 @@ func ReviewQueue(args []string, cfg *config.Config, ui UI) {
 
 	sel := ui.PromptSelect("Select problem to mark reviewed", labelsFromEntries(due))
 	if sel == "" {
-		return
+		return nil
 	}
 	num := ""
 	for _, e := range due {
@@ -143,13 +143,17 @@ func ReviewQueue(args []string, cfg *config.Config, ui UI) {
 		}
 	}
 	if num == "" {
-		return
+		return nil
 	}
 	if prog.MarkReviewed(num) {
-		prog.Save(baseDir)
+		if err := prog.Save(baseDir); err != nil {
+			ui.WriteOutput(MsgError, "Failed to save progress: %v", err)
+			return fmt.Errorf("failed to save progress: %w", err)
+		}
 		ui.WriteOutput(MsgSuccess, "Problem %s marked as reviewed!", num)
 		showNextReview(ui, prog, num)
 	}
+	return nil
 }
 
 func labelsFromEntries(entries []*tracker.ProgressEntry) []string {

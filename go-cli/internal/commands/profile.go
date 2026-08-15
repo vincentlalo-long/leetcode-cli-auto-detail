@@ -7,7 +7,7 @@ import (
 	"leetcli/internal/config"
 )
 
-func Profile(args []string, cfg *config.Config, ui UI) {
+func Profile(args []string, cfg *config.Config, ui UI) error {
 	ui.WriteOutput(MsgPlain, "--- LeetCode User Profile ---\n")
 
 	username := ""
@@ -19,20 +19,20 @@ func Profile(args []string, cfg *config.Config, ui UI) {
 
 	if username == "" {
 		ui.WriteOutput(MsgError, "Username cannot be empty.")
-		return
+		return fmt.Errorf("username cannot be empty")
 	}
 
 	ui.WriteOutput(MsgInfo, "Fetching profile for %s...", username)
 	resp, err := api.GetUserProfile(username)
 	if err != nil {
 		ui.WriteOutput(MsgError, "User '%s' not found or an error occurred.", username)
-		return
+		return fmt.Errorf("user '%s' not found or an error occurred: %w", username, err)
 	}
 
 	matched := resp.Data.MatchedUser
 	if matched == nil {
 		ui.WriteOutput(MsgError, "User '%s' not found.", username)
-		return
+		return fmt.Errorf("user '%s' not found", username)
 	}
 
 	stats := matched.SubmitStats
@@ -59,4 +59,5 @@ func Profile(args []string, cfg *config.Config, ui UI) {
 	ui.WriteOutput(MsgInfo, "Easy:   %d", counts["Easy"])
 	ui.WriteOutput(MsgInfo, "Medium: %d", counts["Medium"])
 	ui.WriteOutput(MsgInfo, "Hard:   %d", counts["Hard"])
+	return nil
 }

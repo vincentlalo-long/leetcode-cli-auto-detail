@@ -12,7 +12,7 @@ import (
 	"leetcli/internal/template"
 )
 
-func Sync(args []string, cfg *config.Config, ui UI) {
+func Sync(args []string, cfg *config.Config, ui UI) error {
 	ui.WriteOutput(MsgPlain, "--- Sync LeetCode Workspace ---\n")
 
 	_, flags := parseFlags(args)
@@ -21,11 +21,11 @@ func Sync(args []string, cfg *config.Config, ui UI) {
 	baseDir := cfg.BaseDir
 	if baseDir == "" {
 		ui.WriteOutput(MsgError, "Base directory not configured.")
-		return
+		return fmt.Errorf("base directory not configured")
 	}
 	if _, err := os.Stat(baseDir); os.IsNotExist(err) {
 		ui.WriteOutput(MsgError, "Base directory '%s' does not exist.", baseDir)
-		return
+		return fmt.Errorf("base directory '%s' does not exist", baseDir)
 	}
 
 	gitDir := filepath.Join(baseDir, ".git")
@@ -35,7 +35,7 @@ func Sync(args []string, cfg *config.Config, ui UI) {
 		ui.WriteOutput(MsgPlain, "  cd %s", baseDir)
 		ui.WriteOutput(MsgPlain, "  git init")
 		ui.WriteOutput(MsgPlain, "  git remote add origin <your-repo-url>")
-		return
+		return fmt.Errorf("'%s' is not a Git repository", baseDir)
 	}
 
 	ui.WriteOutput(MsgInfo, "Syncing workspace: %s", baseDir)
@@ -53,7 +53,7 @@ func Sync(args []string, cfg *config.Config, ui UI) {
 		if out != "" {
 			ui.WriteOutput(MsgPlain, "%s", out)
 		}
-		return
+		return fmt.Errorf("failed to stage changes: %w", err)
 	}
 
 	// .leet/ is git-ignored by default; --progress force-stages the tracker
@@ -77,7 +77,7 @@ func Sync(args []string, cfg *config.Config, ui UI) {
 	statusOut, _ := runGit(baseDir, "status", "--porcelain")
 	if strings.TrimSpace(statusOut) == "" {
 		ui.WriteOutput(MsgInfo, "No changes to sync. Workspace is up to date.")
-		return
+		return nil
 	}
 
 	timestamp := time.Now().Format("2006-01-02 15:04:05")
@@ -88,7 +88,7 @@ func Sync(args []string, cfg *config.Config, ui UI) {
 		if out != "" {
 			ui.WriteOutput(MsgPlain, "%s", out)
 		}
-		return
+		return fmt.Errorf("failed to commit changes: %w", err)
 	}
 
 	ui.WriteOutput(MsgInfo, "Pulling latest changes from remote (if any)...")
@@ -98,7 +98,7 @@ func Sync(args []string, cfg *config.Config, ui UI) {
 			ui.WriteOutput(MsgPlain, "%s", out)
 		}
 		ui.WriteOutput(MsgInfo, "Resolve the issue (e.g. conflicts or missing upstream), then run 'leet sync' again.")
-		return
+		return fmt.Errorf("failed to pull from remote: %w", err)
 	}
 
 	ui.WriteOutput(MsgInfo, "Pushing to remote...")
@@ -110,10 +110,11 @@ func Sync(args []string, cfg *config.Config, ui UI) {
 		if out != "" {
 			ui.WriteOutput(MsgPlain, "%s", out)
 		}
-		return
+		return fmt.Errorf("failed to push changes: %w", err)
 	}
 
 	ui.WriteOutput(MsgSuccess, "Successfully synced LeetCode workspace!")
+	return nil
 }
 
 func runGit(dir string, args ...string) (string, error) {

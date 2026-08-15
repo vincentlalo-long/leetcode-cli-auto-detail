@@ -9,7 +9,7 @@ import (
 	"leetcli/internal/tracker"
 )
 
-func Stats(args []string, cfg *config.Config, ui UI) {
+func Stats(args []string, cfg *config.Config, ui UI) error {
 	ui.WriteOutput(MsgPlain, "--- Problem Statistics ---\n")
 
 	baseDir := cfg.BaseDir
@@ -17,11 +17,11 @@ func Stats(args []string, cfg *config.Config, ui UI) {
 
 	if baseDir == "" {
 		ui.WriteOutput(MsgError, "Missing 'base_dir' in config")
-		return
+		return fmt.Errorf("missing 'base_dir' in config")
 	}
 	if _, err := os.Stat(baseDir); os.IsNotExist(err) {
 		ui.WriteOutput(MsgError, "Base directory does not exist: %s", baseDir)
-		return
+		return fmt.Errorf("base directory does not exist: %s", baseDir)
 	}
 
 	languages := template.NormalizeLanguages(nil)
@@ -95,6 +95,7 @@ func Stats(args []string, cfg *config.Config, ui UI) {
 	} else {
 		ui.WriteOutput(MsgInfo, "No progress tracked yet. Submit solutions or use 'review --solve <num>'.")
 	}
+	return nil
 }
 
 func sortedKeys(m map[string]int) []string {
@@ -111,5 +112,3 @@ func sortedKeys(m map[string]int) []string {
 	}
 	return keys
 }
-
-var _ = fmt.Sprintf

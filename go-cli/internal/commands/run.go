@@ -12,7 +12,7 @@ import (
 	"leetcli/internal/template"
 )
 
-func RunProblem(args []string, cfg *config.Config, ui UI) {
+func RunProblem(args []string, cfg *config.Config, ui UI) error {
 	ui.WriteOutput(MsgPlain, "--- Run Code ---\n")
 
 	problemNum := ""
@@ -23,17 +23,17 @@ func RunProblem(args []string, cfg *config.Config, ui UI) {
 		problemNum = ui.PromptText("Enter problem number to run")
 	}
 	if problemNum == "" {
-		return
+		return fmt.Errorf("problem number is required")
 	}
 
 	baseDir := cfg.BaseDir
 	if baseDir == "" {
 		ui.WriteOutput(MsgError, "Invalid base directory in config")
-		return
+		return fmt.Errorf("invalid base directory in config")
 	}
 	if _, err := os.Stat(baseDir); os.IsNotExist(err) {
 		ui.WriteOutput(MsgError, "Base directory does not exist")
-		return
+		return fmt.Errorf("base directory does not exist")
 	}
 
 	ui.WriteOutput(MsgInfo, "Searching for problem...")
@@ -57,7 +57,7 @@ func RunProblem(args []string, cfg *config.Config, ui UI) {
 
 	if len(matches) == 0 {
 		ui.WriteOutput(MsgError, "Could not find local file for problem %s.", problemNum)
-		return
+		return fmt.Errorf("could not find local file for problem %s", problemNum)
 	}
 
 	targetFile := matches[0]
@@ -80,7 +80,7 @@ func RunProblem(args []string, cfg *config.Config, ui UI) {
 	contentBytes, err := os.ReadFile(targetFile)
 	if err != nil {
 		ui.WriteOutput(MsgError, "Failed to read file: %v", err)
-		return
+		return fmt.Errorf("failed to read file: %w", err)
 	}
 	content := string(contentBytes)
 
@@ -88,7 +88,7 @@ func RunProblem(args []string, cfg *config.Config, ui UI) {
 	langKey := template.GetLanguageByExtension(languages, ext)
 	if langKey == "" {
 		ui.WriteOutput(MsgError, "Unsupported file extension.")
-		return
+		return fmt.Errorf("unsupported file extension")
 	}
 
 	switch langKey {
@@ -117,7 +117,7 @@ func RunProblem(args []string, cfg *config.Config, ui UI) {
 		if err != nil {
 			ui.WriteOutput(MsgError, "Compilation failed!")
 			ui.WriteOutput(MsgPlain, "%s", string(compileOut))
-			return
+			return fmt.Errorf("compilation failed: %w", err)
 		}
 		if len(compileOut) > 0 {
 			ui.WriteOutput(MsgInfo, "Compiled with warnings:\n%s", string(compileOut))
@@ -159,7 +159,7 @@ func RunProblem(args []string, cfg *config.Config, ui UI) {
 		compileOut, err := compileCmd.CombinedOutput()
 		if err != nil {
 			ui.WriteOutput(MsgError, "Java compilation failed!\n%s", string(compileOut))
-			return
+			return fmt.Errorf("java compilation failed: %w", err)
 		}
 		ui.WriteOutput(MsgPlain, "\n--- Output ---\n")
 		runCmd := exec.Command("java", "-cp", tmpDir, "Solution")
@@ -182,7 +182,7 @@ func RunProblem(args []string, cfg *config.Config, ui UI) {
 		compileOut, err := compileCmd.CombinedOutput()
 		if err != nil {
 			ui.WriteOutput(MsgError, "Rust compilation failed!\n%s", string(compileOut))
-			return
+			return fmt.Errorf("rust compilation failed: %w", err)
 		}
 		ui.WriteOutput(MsgPlain, "\n--- Output ---\n")
 		runCmd := exec.Command(exePath)
@@ -229,5 +229,7 @@ func RunProblem(args []string, cfg *config.Config, ui UI) {
 
 	default:
 		ui.WriteOutput(MsgError, "Running '%s' files is not supported yet.", langKey)
+		return fmt.Errorf("running '%s' files is not supported yet", langKey)
 	}
+	return nil
 }

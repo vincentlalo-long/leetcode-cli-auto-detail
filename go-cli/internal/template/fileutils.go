@@ -55,6 +55,22 @@ func GetAllSolutionFiles(baseDir string, extensions []string) []string {
 	return files
 }
 
+var winIllegalFileRe = regexp.MustCompile(`[\\/:*?"<>|\x00-\x1f]+`)
+
+// SanitizeFileName makes a problem name safe to use as a file name: it strips
+// Windows-illegal characters and path separators (blocking directory
+// traversal), trims leading/trailing dots and spaces, and collapses whitespace
+// to underscores. Returns "" when nothing safe remains.
+func SanitizeFileName(name string) string {
+	s := winIllegalFileRe.ReplaceAllString(name, "_")
+	s = strings.Trim(s, " .")
+	s = strings.ReplaceAll(s, " ", "_")
+	for strings.Contains(s, "__") {
+		s = strings.ReplaceAll(s, "__", "_")
+	}
+	return strings.Trim(s, "._")
+}
+
 func CreateProblemDirectory(baseDir, dsFolder, folderName string) (string, error) {
 	dir := filepath.Join(baseDir, dsFolder, folderName)
 	if err := os.MkdirAll(dir, 0755); err != nil {

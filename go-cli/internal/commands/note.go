@@ -11,7 +11,7 @@ import (
 	"leetcli/internal/template"
 )
 
-func AddNote(args []string, cfg *config.Config, ui UI) {
+func AddNote(args []string, cfg *config.Config, ui UI) error {
 	ui.WriteOutput(MsgPlain, "--- Add Study Note / Takeaway ---\n")
 
 	problemNum := ""
@@ -21,7 +21,7 @@ func AddNote(args []string, cfg *config.Config, ui UI) {
 		problemNum = ui.PromptText("Enter problem number")
 	}
 	if problemNum == "" {
-		return
+		return fmt.Errorf("problem number is required")
 	}
 
 	baseDir := cfg.BaseDir
@@ -45,7 +45,7 @@ func AddNote(args []string, cfg *config.Config, ui UI) {
 
 	if len(matches) == 0 {
 		ui.WriteOutput(MsgError, "Could not find problem file for %s in workspace.", problemNum)
-		return
+		return fmt.Errorf("could not find problem file for %s in workspace", problemNum)
 	}
 
 	targetFile := matches[0]
@@ -66,7 +66,7 @@ func AddNote(args []string, cfg *config.Config, ui UI) {
 	noteText := ui.PromptText("Enter your key note / takeaway for this problem")
 	if strings.TrimSpace(noteText) == "" {
 		ui.WriteOutput(MsgInfo, "No note entered. Aborted.")
-		return
+		return nil
 	}
 
 	targetDir := filepath.Dir(targetFile)
@@ -80,21 +80,26 @@ func AddNote(args []string, cfg *config.Config, ui UI) {
 		initContent := fmt.Sprintf("# %s\n", title) + formattedNote
 		if err := os.WriteFile(readmePath, []byte(initContent), 0644); err != nil {
 			ui.WriteOutput(MsgError, "Failed to create README.md: %v", err)
-			return
+			return fmt.Errorf("failed to create README.md: %w", err)
 		}
 	} else {
 		f, err := os.OpenFile(readmePath, os.O_APPEND|os.O_WRONLY, 0644)
 		if err != nil {
 			ui.WriteOutput(MsgError, "Failed to open README.md: %v", err)
-			return
+			return fmt.Errorf("failed to open README.md: %w", err)
 		}
-		defer f.Close()
 		if _, err := f.WriteString(formattedNote); err != nil {
+			f.Close()
 			ui.WriteOutput(MsgError, "Failed to write note to README.md: %v", err)
-			return
+			return fmt.Errorf("failed to write note to README.md: %w", err)
+		}
+		if err := f.Close(); err != nil {
+			ui.WriteOutput(MsgError, "Failed to close README.md: %v", err)
+			return fmt.Errorf("failed to close README.md: %w", err)
 		}
 	}
 
 	ui.WriteOutput(MsgSuccess, "Saved note to %s!", filepath.Base(readmePath))
 	ui.WriteOutput(MsgInfo, "Note: %s", noteText)
+	return nil
 }

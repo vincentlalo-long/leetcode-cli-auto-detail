@@ -8,7 +8,7 @@ import (
 	"leetcli/internal/template"
 )
 
-func Hint(args []string, cfg *config.Config, ui UI) {
+func Hint(args []string, cfg *config.Config, ui UI) error {
 	ui.WriteOutput(MsgPlain, "--- Get Problem Hints ---\n")
 
 	problemNum := ""
@@ -19,14 +19,14 @@ func Hint(args []string, cfg *config.Config, ui UI) {
 		problemNum = ui.PromptText("Enter problem number")
 	}
 	if problemNum == "" {
-		return
+		return fmt.Errorf("problem number is required")
 	}
 
 	ui.WriteOutput(MsgInfo, "Looking up problem...")
 	problemData, err := api.GetProblemByID(problemNum)
 	if err != nil {
 		ui.WriteOutput(MsgError, "Could not find problem with ID %s", problemNum)
-		return
+		return fmt.Errorf("could not find problem with ID %s", problemNum)
 	}
 
 	ui.WriteOutput(MsgSuccess, "Found: %s", problemData.Title)
@@ -35,12 +35,12 @@ func Hint(args []string, cfg *config.Config, ui UI) {
 	details, err := api.GetProblemDetails(problemData.Slug)
 	if err != nil {
 		ui.WriteOutput(MsgError, "Failed to fetch problem details from LeetCode.")
-		return
+		return fmt.Errorf("failed to fetch problem details: %w", err)
 	}
 
 	if len(details.Hints) == 0 {
 		ui.WriteOutput(MsgInfo, "No official hints available for this problem.")
-		return
+		return nil
 	}
 
 	ui.WriteOutput(MsgPlain, "\nHints for %s (%d total):", problemData.Title, len(details.Hints))
@@ -58,6 +58,5 @@ func Hint(args []string, cfg *config.Config, ui UI) {
 	}
 
 	ui.WriteOutput(MsgSuccess, "Finished showing hints.")
+	return nil
 }
-
-var _ = fmt.Sprintf

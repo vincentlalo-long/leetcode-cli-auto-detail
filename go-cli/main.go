@@ -29,10 +29,14 @@ func main() {
 		if handler, ok := commands.Registry[cmdName]; ok {
 			// Support `leet <cmd> --help` / `leet <cmd> -h`.
 			if wantsHelp(args) && cmdName != "help" && cmdName != "man" && cmdName != "--help" && cmdName != "-h" {
-				commands.Registry["help"]([]string{cmdName}, cfg, commands.HeadlessUI{})
+				if err := commands.Registry["help"]([]string{cmdName}, cfg, commands.HeadlessUI{}); err != nil {
+					os.Exit(1)
+				}
 				return
 			}
-			handler(args, cfg, commands.HeadlessUI{})
+			if err := handler(args, cfg, commands.HeadlessUI{}); err != nil {
+				os.Exit(1)
+			}
 			return
 		}
 		fmt.Fprintf(os.Stderr, "Unknown command: '%s'. Available commands:\n", cmdName)

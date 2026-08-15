@@ -62,6 +62,10 @@ func hasFlag(flags map[string]string, key string) bool {
 // HeadlessUI implements commands.UI for non-interactive CLI mode (leet <cmd> [args]).
 type HeadlessUI struct{}
 
+func (h HeadlessUI) IsHeadless() bool {
+	return true
+}
+
 func (h HeadlessUI) PromptText(label string) string {
 	fmt.Fprintf(os.Stderr, "✘ Cannot prompt in non-interactive mode: %s\n", label)
 	return ""

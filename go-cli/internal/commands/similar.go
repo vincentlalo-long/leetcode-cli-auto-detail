@@ -2,7 +2,7 @@ package commands
 
 import (
 	"encoding/json"
-	"strings"
+	"fmt"
 
 	"leetcli/internal/api"
 	"leetcli/internal/config"
@@ -15,7 +15,7 @@ type SimilarProblem struct {
 	Difficulty  string `json:"difficulty"`
 }
 
-func Similar(args []string, cfg *config.Config, ui UI) {
+func Similar(args []string, cfg *config.Config, ui UI) error {
 	ui.WriteOutput(MsgPlain, "--- Find Similar Problems ---\n")
 
 	problemNum := ""
@@ -26,14 +26,14 @@ func Similar(args []string, cfg *config.Config, ui UI) {
 		problemNum = ui.PromptText("Enter problem number")
 	}
 	if problemNum == "" {
-		return
+		return fmt.Errorf("problem number is required")
 	}
 
 	ui.WriteOutput(MsgInfo, "Looking up problem...")
 	problemData, err := api.GetProblemByID(problemNum)
 	if err != nil {
 		ui.WriteOutput(MsgError, "Could not find problem with ID %s", problemNum)
-		return
+		return fmt.Errorf("could not find problem with ID %s", problemNum)
 	}
 
 	ui.WriteOutput(MsgSuccess, "Found: %s", problemData.Title)
@@ -42,23 +42,23 @@ func Similar(args []string, cfg *config.Config, ui UI) {
 	details, err := api.GetProblemDetails(problemData.Slug)
 	if err != nil {
 		ui.WriteOutput(MsgError, "Failed to fetch problem details from LeetCode.")
-		return
+		return fmt.Errorf("failed to fetch problem details: %w", err)
 	}
 
 	if details.SimilarQuestions == "" {
 		ui.WriteOutput(MsgInfo, "No similar problems available for this problem.")
-		return
+		return nil
 	}
 
 	var similar []SimilarProblem
 	if err := json.Unmarshal([]byte(details.SimilarQuestions), &similar); err != nil {
 		ui.WriteOutput(MsgError, "Failed to parse similar problems data.")
-		return
+		return fmt.Errorf("failed to parse similar problems data: %w", err)
 	}
 
 	if len(similar) == 0 {
 		ui.WriteOutput(MsgInfo, "No similar problems found for this problem.")
-		return
+		return nil
 	}
 
 	languages := template.NormalizeLanguages(nil)
@@ -83,7 +83,5 @@ func Similar(args []string, cfg *config.Config, ui UI) {
 	}
 
 	ui.WriteOutput(MsgSuccess, "Finished showing similar problems.")
+	return nil
 }
-
-var _ = strings.Join
-var _ = template.CountSolutions

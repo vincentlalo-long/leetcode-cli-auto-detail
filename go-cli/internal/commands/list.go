@@ -20,7 +20,7 @@ type ProblemRecord struct {
 	Difficulty string
 }
 
-func ListProblems(args []string, cfg *config.Config, ui UI) {
+func ListProblems(args []string, cfg *config.Config, ui UI) error {
 	ui.WriteOutput(MsgPlain, "--- List Problems ---\n")
 
 	pos, flags := parseFlags(args)
@@ -30,11 +30,11 @@ func ListProblems(args []string, cfg *config.Config, ui UI) {
 
 	if baseDir == "" {
 		ui.WriteOutput(MsgError, "Missing 'base_dir' in config")
-		return
+		return fmt.Errorf("missing 'base_dir' in config")
 	}
 	if _, err := os.Stat(baseDir); os.IsNotExist(err) {
 		ui.WriteOutput(MsgError, "Base directory does not exist: %s", baseDir)
-		return
+		return fmt.Errorf("base directory does not exist: %s", baseDir)
 	}
 
 	languages := template.NormalizeLanguages(nil)
@@ -49,7 +49,7 @@ func ListProblems(args []string, cfg *config.Config, ui UI) {
 	records := collectProblems(baseDir, dataStructures, exts)
 	if len(records) == 0 {
 		ui.WriteOutput(MsgInfo, "No problem files found")
-		return
+		return nil
 	}
 
 	// Non-interactive flags: leet list --ds array --difficulty Easy --unsolved
@@ -124,7 +124,7 @@ func ListProblems(args []string, cfg *config.Config, ui UI) {
 
 	if len(filtered) == 0 {
 		ui.WriteOutput(MsgInfo, "No problems match selected filters")
-		return
+		return nil
 	}
 
 	ui.WriteOutput(MsgPlain, "\nProblems:")
@@ -140,6 +140,7 @@ func ListProblems(args []string, cfg *config.Config, ui UI) {
 		ui.WriteOutput(MsgPlain, "  %d. %s (%s, %s, %s)", i+1, r.FileName, r.Structure, diff, status)
 		ui.WriteOutput(MsgPlain, "     %s", r.FilePath)
 	}
+	return nil
 }
 
 func isDifficulty(s string) bool {

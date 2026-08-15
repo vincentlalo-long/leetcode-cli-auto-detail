@@ -221,17 +221,17 @@ var CommandOrder = []string{
 
 // HelpCommand is the handler for help/man/--help/-h. With no arguments it
 // lists all commands; with a command name it prints that command's manual.
-func HelpCommand(args []string, cfg *config.Config, ui UI) {
+func HelpCommand(args []string, cfg *config.Config, ui UI) error {
 	if len(args) > 0 && strings.TrimSpace(args[0]) != "" {
 		name := strings.TrimSpace(args[0])
 		if doc, ok := CommandDocs[name]; ok {
 			ui.WriteOutput(MsgPlain, "--- Help: %s ---\n", name)
 			ui.WriteString(renderDocPlain(doc))
-			return
+			return nil
 		}
 		ui.WriteOutput(MsgError, "No manual found for command '%s'.", name)
 		ui.WriteOutput(MsgInfo, "Run 'leet help' to list all commands.")
-		return
+		return fmt.Errorf("no manual for command '%s'", name)
 	}
 
 	ui.WriteOutput(MsgPlain, "leet CLI - Available Commands")
@@ -245,6 +245,7 @@ func HelpCommand(args []string, cfg *config.Config, ui UI) {
 	}
 	ui.WriteOutput(MsgPlain, "")
 	ui.WriteOutput(MsgInfo, "Use 'leet help <command>' for usage and examples of a specific command.")
+	return nil
 }
 
 // renderDocPlain renders a manual entry as plain text (headless friendly).

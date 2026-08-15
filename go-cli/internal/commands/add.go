@@ -11,7 +11,7 @@ import (
 	"leetcli/internal/template"
 )
 
-func AddProblem(args []string, cfg *config.Config, ui UI) {
+func AddProblem(args []string, cfg *config.Config, ui UI) error {
 	ui.WriteOutput(MsgPlain, "--- Add New Problem ---\n")
 
 	pos, flags := parseFlags(args)
@@ -27,7 +27,7 @@ func AddProblem(args []string, cfg *config.Config, ui UI) {
 		problemNum = ui.PromptText("Problem number")
 	}
 	if problemNum == "" {
-		return
+		return fmt.Errorf("problem number is required")
 	}
 
 	suggestedName := ""
@@ -52,7 +52,7 @@ func AddProblem(args []string, cfg *config.Config, ui UI) {
 	}
 	if problemName == "" {
 		ui.WriteOutput(MsgError, "Problem name cannot be empty")
-		return
+		return fmt.Errorf("problem name cannot be empty")
 	}
 
 	dataStructures := cfg.GetDataStructures()
@@ -69,19 +69,25 @@ func AddProblem(args []string, cfg *config.Config, ui UI) {
 	if selected == "" {
 		selected = ui.PromptSelect("Select data structure", dsChoices)
 	}
+	if selected == "" {
+		return nil
+	}
 
 	if selected == "Add new data structure" {
 		name := ui.PromptText("Data structure name (e.g., tree)")
 		folder := name
 		if folder == "" {
-			return
+			return nil
 		}
 		folderInput := ui.PromptText(fmt.Sprintf("Folder name (press Enter for '%s')", name))
 		if folderInput != "" {
 			folder = folderInput
 		}
 		if cfg.AddDataStructure(name, folder) {
-			cfg.Save()
+			if err := cfg.Save(); err != nil {
+				ui.WriteOutput(MsgError, "Failed to save config: %v", err)
+				return fmt.Errorf("failed to save config: %w", err)
+			}
 			ui.WriteOutput(MsgSuccess, "Added data structure: %s -> %s", name, folder)
 		}
 		dataStructures = cfg.GetDataStructures()
@@ -90,6 +96,9 @@ func AddProblem(args []string, cfg *config.Config, ui UI) {
 			dsChoices = append(dsChoices, k)
 		}
 		selected = ui.PromptSelect("Select data structure", dsChoices)
+		if selected == "" {
+			return nil
+		}
 	}
 
 	dsFolder := "uncategorized"
@@ -117,23 +126,37 @@ func AddProblem(args []string, cfg *config.Config, ui UI) {
 	}
 	langExt := languages[langKey].Ext
 
-	slug := api.Slugify(problemName)
+	slug := ""
+	if problemData != nil && problemData.Slug != "" {
+		slug = problemData.Slug
+	}
+	if slug == "" {
+		slug = api.Slugify(problemName)
+	}
 	folderName := fmt.Sprintf("%s-%s", problemNum, slug)
 	problemDir, err := template.CreateProblemDirectory(cfg.BaseDir, dsFolder, folderName)
 	if err != nil {
 		ui.WriteOutput(MsgError, "Failed to create directory: %v", err)
-		return
+		return fmt.Errorf("failed to create directory: %w", err)
 	}
 
-	problemFile := filepath.Join(problemDir, fmt.Sprintf("%s_%s.%s", problemNum, problemName, langExt))
+	safeName := template.SanitizeFileName(problemName)
+	if safeName == "" {
+		safeName = slug
+	}
+	problemFile := filepath.Join(problemDir, fmt.Sprintf("%s_%s.%s", problemNum, safeName, langExt))
 
 	if _, err := os.Stat(problemFile); err == nil {
 		ui.WriteOutput(MsgError, "Problem file already exists!")
-		return
+		return fmt.Errorf("problem file already exists")
 	}
 
 	ui.WriteOutput(MsgInfo, "Fetching problem details from LeetCode...")
-	details, _ := api.GetProblemDetails(slug)
+	details, err := api.GetProblemDetails(slug)
+	if err != nil {
+		ui.WriteOutput(MsgError, "Could not fetch problem details: %v", err)
+		details = nil
+	}
 
 	content := ""
 	if details != nil {
@@ -159,7 +182,7 @@ func AddProblem(args []string, cfg *config.Config, ui UI) {
 	err = os.WriteFile(problemFile, []byte(content), 0644)
 	if err != nil {
 		ui.WriteOutput(MsgError, "Failed to write file: %v", err)
-		return
+		return fmt.Errorf("failed to write file: %w", err)
 	}
 
 	if details != nil && details.Content != "" {
@@ -178,10 +201,14 @@ func AddProblem(args []string, cfg *config.Config, ui UI) {
 				}
 				return tags
 			}(), ", "), mdContent)
-		os.WriteFile(readmePath, []byte(readmeContent), 0644)
+		if err := os.WriteFile(readmePath, []byte(readmeContent), 0644); err != nil {
+			ui.WriteOutput(MsgError, "Failed to write README.md: %v", err)
+			return fmt.Errorf("failed to write README.md: %w", err)
+		}
 		ui.WriteOutput(MsgSuccess, "Saved problem description to README.md")
 	}
 
 	ui.WriteOutput(MsgSuccess, "Created problem directory and files")
 	ui.WriteOutput(MsgInfo, "Path: %s", problemFile)
+	return nil
 }

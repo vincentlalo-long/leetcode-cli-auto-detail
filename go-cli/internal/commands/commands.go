@@ -24,7 +24,10 @@ type UI interface {
 	Writef(format string, args ...interface{})
 }
 
-type Handler func(args []string, cfg *config.Config, ui UI)
+// Handler runs one CLI command. It returns a non-nil error when the command
+// failed so headless (script/CI) invocations can exit non-zero. The TUI ignores
+// the return value (errors are already reported via ui.WriteOutput).
+type Handler func(args []string, cfg *config.Config, ui UI) error
 
 var Registry = map[string]Handler{
 	"add":               AddProblem,
