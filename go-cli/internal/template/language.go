@@ -185,6 +185,23 @@ int main() {
     return 0;
 }
 `, header)
+	case "cpp":
+		return fmt.Sprintf(`%s#include <iostream>
+#include <vector>
+#include <string>
+
+using namespace std;
+
+class Solution {
+public:
+    // Write your solution method here, e.g.:
+    // int twoSum(vector<int>& nums, int target) { ... }
+};
+
+int main() {
+    return 0;
+}
+`, header)
 	case "java":
 		return fmt.Sprintf(`%spublic class Solution {
     public static void main(String[] args) {

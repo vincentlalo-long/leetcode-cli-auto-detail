@@ -3,6 +3,8 @@ package template
 import (
 	"encoding/json"
 	"fmt"
+	"go/parser"
+	"go/token"
 	"regexp"
 	"strconv"
 	"strings"
@@ -41,8 +43,10 @@ func ExtractMethodSignature(langKey, code string) (MethodSig, bool) {
 	switch langKey {
 	case "python":
 		return extractPythonMethod(code)
-	case "cpp", "c":
+	case "cpp":
 		return extractCxxMethod(code)
+	case "c":
+		return extractCMethod(code)
 	case "go":
 		return extractGoMethod(code)
 	case "java":
@@ -122,6 +126,85 @@ func extractCxxMethod(code string) (MethodSig, bool) {
 		}
 	}
 	return MethodSig{Name: m[2], Params: params, ReturnType: ret}, true
+}
+
+// extractCMethod locates the entry function of a C solution. C has no
+// class Solution, so we look for a top-level function and prefer the one with
+// a non-void return type (LeetCode C entry functions return the result).
+func extractCMethod(code string) (MethodSig, bool) {
+	code = stripCComments(code)
+	methodRe := regexp.MustCompile(`(?s)([\w<>{},\[\]\*&\s]+?)\s+([A-Za-z_]\w*)\s*\(([^)]*)\)\s*\{`)
+	matches := methodRe.FindAllStringSubmatch(code, -1)
+
+	type candidate struct {
+		ms      MethodSig
+		nonVoid bool
+		params  int
+	}
+	var first, best *candidate
+	for _, m := range matches {
+		ret := strings.TrimSpace(m[1])
+		if strings.Contains(ret, "}") || strings.Contains(ret, "#") || strings.Contains(ret, ";") ||
+			strings.Contains(ret, "static") {
+			continue
+		}
+		name := m[2]
+		if name == "main" || strings.HasPrefix(name, "__") {
+			continue
+		}
+		var params []Param
+		for _, tok := range splitFields(m[3]) {
+			tok = strings.TrimSpace(tok)
+			if tok == "" {
+				continue
+			}
+			identRe := regexp.MustCompile(`([A-Za-z_]\w*)\s*$`)
+			if im := identRe.FindStringSubmatch(tok); im != nil {
+				params = append(params, Param{Name: im[1], Type: strings.TrimSpace(tok[:len(tok)-len(im[1])])})
+			}
+		}
+		nonVoid := !strings.HasPrefix(strings.ToLower(ret), "void")
+		cand := &candidate{ms: MethodSig{Name: name, Params: params, ReturnType: ret}, nonVoid: nonVoid, params: len(params)}
+		if first == nil {
+			first = cand
+		}
+		if best == nil || (cand.nonVoid && !best.nonVoid) || (cand.nonVoid == best.nonVoid && cand.params > best.params) {
+			best = cand
+		}
+	}
+	if best == nil {
+		return MethodSig{}, false
+	}
+	return best.ms, true
+}
+
+func stripCComments(code string) string {
+	var sb strings.Builder
+	sb.Grow(len(code))
+	for i := 0; i < len(code); i++ {
+		if code[i] == '/' && i+1 < len(code) && code[i+1] == '*' {
+			for j := i + 2; j < len(code); j++ {
+				if code[j] == '*' && j+1 < len(code) && code[j+1] == '/' {
+					i = j + 1
+					break
+				}
+			}
+			sb.WriteByte(' ')
+			continue
+		}
+		if code[i] == '/' && i+1 < len(code) && code[i+1] == '/' {
+			for j := i + 2; j < len(code); j++ {
+				if code[j] == '\n' {
+					i = j - 1
+					break
+				}
+			}
+			sb.WriteByte(' ')
+			continue
+		}
+		sb.WriteByte(code[i])
+	}
+	return sb.String()
 }
 
 func extractGoMethod(code string) (MethodSig, bool) {
@@ -463,8 +546,10 @@ func BuildLocalHarness(langKey, solutionCode string, sig MethodSig, cases []Test
 		return buildJsHarness(langKey, solutionCode, sig)
 	case "go":
 		return buildGoHarness(solutionCode, sig)
-	case "cpp", "c":
+	case "cpp":
 		return buildCppHarness(solutionCode, sig, cases)
+	case "c":
+		return buildCHarness(solutionCode, sig, cases)
 	case "java":
 		return buildJavaHarness(solutionCode, sig, cases)
 	}
@@ -549,7 +634,51 @@ func buildGoHarness(code string, sig MethodSig) (string, bool) {
 	sb.WriteString("\t}\n")
 	sb.WriteString("}\n\n")
 	sb.WriteString("func main() {\n\tleetMain()\n}\n")
-	return sb.String(), true
+	return ensureGoImports(sb.String(), []string{"encoding/json", "fmt", "io", "os"})
+}
+
+// ensureGoImports makes sure the Go test file imports every package in
+// `needed`. Solution stubs usually only import fmt (or nothing), but the
+// harness also uses os, io and encoding/json. Go allows multiple import
+// declarations, so we only inject the missing ones to avoid duplicates.
+func ensureGoImports(code string, needed []string) (string, bool) {
+	fset := token.NewFileSet()
+	f, err := parser.ParseFile(fset, "solution.go", code, parser.ImportsOnly)
+	if err != nil {
+		return "", false
+	}
+	existing := map[string]bool{}
+	for _, imp := range f.Imports {
+		if p, e := strconv.Unquote(imp.Path.Value); e == nil {
+			existing[p] = true
+		}
+	}
+	var missing []string
+	for _, p := range needed {
+		if !existing[p] {
+			missing = append(missing, p)
+		}
+	}
+	if len(missing) == 0 {
+		return code, true
+	}
+
+	lines := make([]string, 0, len(missing))
+	for _, p := range missing {
+		lines = append(lines, "\t\""+p+"\"")
+	}
+	block := "\nimport (\n" + strings.Join(lines, "\n") + "\n)\n"
+
+	pkgIdx := strings.Index(code, "package ")
+	if pkgIdx < 0 {
+		return "", false
+	}
+	nl := strings.Index(code[pkgIdx:], "\n")
+	if nl < 0 {
+		return "", false
+	}
+	pos := pkgIdx + nl + 1
+	return code[:pos] + block + code[pos:], true
 }
 
 func goTypeFor(t string) string {
@@ -798,6 +927,391 @@ string __j(const TreeNode* root) {
     if (root) walk(root);
     o += "]";
     return o;
+}
+`
+
+// buildCHarness wraps a C solution in a self-contained main() that runs the
+// example test cases. C signatures differ from C++: array inputs are split into
+// a pointer plus a size parameter, and functions returning arrays take an
+// `int* returnSize` out-parameter, so the harness maps example args onto these
+// conventions instead of consuming one arg per parameter.
+func buildCHarness(code string, sig MethodSig, cases []TestCase) (string, bool) {
+	hasListNode := strings.Contains(code, "ListNode")
+	hasTreeNode := strings.Contains(code, "TreeNode")
+
+	sb := &strings.Builder{}
+	sb.WriteString("#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n#include <stdbool.h>\n#include <stdint.h>\n\n")
+	sb.WriteString(cPrinterSrc)
+	sb.WriteString("\n")
+	// Solution code must come before the ListNode/TreeNode helpers: they need
+	// the full struct definitions to allocate and walk the nodes.
+	sb.WriteString(strings.TrimSpace(code))
+	sb.WriteString("\n\n")
+	if hasListNode {
+		sb.WriteString(cListNodeSrc)
+	}
+	if hasTreeNode {
+		sb.WriteString(cTreeNodeSrc)
+	}
+	sb.WriteString("\nint main(void) {\n")
+
+	for _, tc := range cases {
+		sb.WriteString("    {\n")
+		varNames := make([]string, 0, len(tc.Args))
+		argIdx := 0
+		prevLenVar := ""
+		outSizeVar := ""
+		for pi, p := range sig.Params {
+			raw := strings.TrimSpace(p.Type)
+			name := strings.TrimSpace(p.Name)
+			if name == "" {
+				name = fmt.Sprintf("__p%d", pi)
+			}
+			lower := strings.ToLower(name)
+
+			// int* out-parameter such as returnSize: point it at a local int
+			// that the solution fills in.
+			if (raw == "int*" || raw == "int *") && (strings.Contains(lower, "return") ||
+				(pi == len(sig.Params)-1 && strings.Contains(lower, "size"))) {
+				out := fmt.Sprintf("__o%d", pi)
+				fmt.Fprintf(sb, "        int %s = 0;\n", out)
+				fmt.Fprintf(sb, "        int* %s = &%s;\n", name, out)
+				varNames = append(varNames, name)
+				outSizeVar = out
+				continue
+			}
+
+			// Derived size param (e.g. numsSize) following an array pointer.
+			if isIntScalarC(raw) && strings.HasSuffix(lower, "size") && prevLenVar != "" {
+				fmt.Fprintf(sb, "        int %s = %s;\n", name, prevLenVar)
+				varNames = append(varNames, name)
+				continue
+			}
+
+			if argIdx >= len(tc.Args) {
+				return "", false
+			}
+			arg := strings.TrimSpace(tc.Args[argIdx])
+			argIdx++
+
+			switch {
+			case strings.Contains(raw, "ListNode"):
+				fmt.Fprintf(sb, "        struct ListNode* %s = __mk_list(%s);\n", name, strconv.Quote(arg))
+			case strings.Contains(raw, "TreeNode"):
+				fmt.Fprintf(sb, "        struct TreeNode* %s = __mk_tree(%s);\n", name, strconv.Quote(arg))
+			case raw == "char*" || raw == "char *":
+				fmt.Fprintf(sb, "        char* %s = (char*)%s;\n", name, strconv.Quote(arg))
+			case raw == "char**" || raw == "char **":
+				fmt.Fprintf(sb, "        int __n%d = __split_strs(%s, NULL, 8192);\n", pi, strconv.Quote(arg))
+				fmt.Fprintf(sb, "        char** %s = (char**)malloc((size_t)__n%d * sizeof(char*));\n", name, pi)
+				fmt.Fprintf(sb, "        __split_strs(%s, %s, 8192);\n", strconv.Quote(arg), name)
+			case raw == "int*" || raw == "int *":
+				fmt.Fprintf(sb, "        int __v%d[8192];\n", pi)
+				fmt.Fprintf(sb, "        int __n%d = __parse_ints(%s, __v%d, NULL, 8192);\n", pi, strconv.Quote(arg), pi)
+				fmt.Fprintf(sb, "        int* %s = __v%d;\n", name, pi)
+				prevLenVar = fmt.Sprintf("__n%d", pi)
+			default:
+				scalar, ok := cScalarType(raw)
+				if !ok {
+					return "", false
+				}
+				lit, ok := cppElement(arg)
+				if !ok {
+					return "", false
+				}
+				fmt.Fprintf(sb, "        %s %s = %s;\n", scalar, name, lit)
+			}
+			varNames = append(varNames, name)
+		}
+
+		invoke := fmt.Sprintf("%s(%s)", sig.Name, strings.Join(varNames, ", "))
+		retKind := cReturnKind(sig.ReturnType)
+		if retKind == "void" {
+			fmt.Fprintf(sb, "        %s;\n", invoke)
+		} else {
+			decl, ok := cDeclType(sig.ReturnType)
+			if !ok {
+				return "", false
+			}
+			fmt.Fprintf(sb, "        %s __r = %s;\n", decl, invoke)
+		}
+
+		switch retKind {
+		case "void":
+			// nothing to print
+		case "int":
+			sb.WriteString("        __j_int(__r);\n")
+		case "long":
+			sb.WriteString("        __j_longlong((long long)__r);\n")
+		case "bool":
+			sb.WriteString("        __j_bool(__r);\n")
+		case "char":
+			sb.WriteString("        __j_char(__r);\n")
+		case "double":
+			sb.WriteString("        __j_double(__r);\n")
+		case "string":
+			sb.WriteString("        __j_str(__r);\n")
+		case "intarr", "chararr":
+			if outSizeVar == "" {
+				return "", false
+			}
+			if retKind == "intarr" {
+				fmt.Fprintf(sb, "        __j_int_arr(__r, %s);\n", outSizeVar)
+			} else {
+				fmt.Fprintf(sb, "        __j_char_arr(__r, %s);\n", outSizeVar)
+			}
+		case "listnode":
+			sb.WriteString("        __j_listnode(__r);\n")
+		case "treenode":
+			sb.WriteString("        __j_treenode(__r);\n")
+		default:
+			return "", false
+		}
+		sb.WriteString("    }\n")
+	}
+	sb.WriteString("    return 0;\n}\n")
+	return sb.String(), true
+}
+
+func isIntScalarC(t string) bool {
+	switch t {
+	case "int", "long", "long long", "int64_t", "size_t", "unsigned int", "unsigned long", "short":
+		return true
+	}
+	return false
+}
+
+func cScalarType(t string) (string, bool) {
+	switch t {
+	case "int", "long", "long long", "int64_t", "size_t", "unsigned int", "unsigned long", "short", "float", "double", "bool", "char":
+		return t, true
+	}
+	return "", false
+}
+
+func cDeclType(t string) (string, bool) {
+	norm := strings.ReplaceAll(strings.TrimSpace(t), " ", "")
+	switch {
+	case strings.Contains(norm, "ListNode"):
+		return "struct ListNode*", true
+	case strings.Contains(norm, "TreeNode"):
+		return "struct TreeNode*", true
+	case norm == "char**":
+		return "char**", true
+	case norm == "char*":
+		return "char*", true
+	case norm == "int*":
+		return "int*", true
+	case isIntScalarC(norm):
+		return norm, true
+	case norm == "float", norm == "double", norm == "bool", norm == "char":
+		return norm, true
+	}
+	return "", false
+}
+
+func cReturnKind(t string) string {
+	norm := strings.ReplaceAll(strings.TrimSpace(t), " ", "")
+	switch {
+	case strings.HasPrefix(norm, "void"):
+		return "void"
+	case strings.Contains(norm, "ListNode"):
+		return "listnode"
+	case strings.Contains(norm, "TreeNode"):
+		return "treenode"
+	case strings.Contains(norm, "char**"):
+		return "chararr"
+	case strings.Contains(norm, "char*"):
+		return "string"
+	case strings.Contains(norm, "int*"):
+		return "intarr"
+	case norm == "int":
+		return "int"
+	case norm == "long", norm == "longlong", norm == "int64_t", norm == "unsignedlong":
+		return "long"
+	case norm == "bool":
+		return "bool"
+	case norm == "double", norm == "float":
+		return "double"
+	case norm == "char":
+		return "char"
+	}
+	return ""
+}
+
+const cPrinterSrc = `
+static void __j_int(int v) { printf("RESULT\t%d\n", v); }
+static void __j_longlong(long long v) { printf("RESULT\t%lld\n", v); }
+static void __j_bool(int v) { printf("RESULT\t%s\n", v ? "true" : "false"); }
+static void __j_char(char v) { printf("RESULT\t\"%c\"\n", v); }
+static void __j_double(double v) {
+    long long i = (long long)v;
+    if ((double)i == v) { printf("RESULT\t%lld\n", i); return; }
+    printf("RESULT\t%.15g\n", v);
+}
+static void __j_str(const char* s) {
+    if (!s) { printf("RESULT\tnull\n"); return; }
+    printf("RESULT\t\"");
+    for (const char* p = s; *p; ++p) {
+        if (*p == '"' || *p == '\\') putchar('\\');
+        putchar(*p);
+    }
+    printf("\"\n");
+}
+static void __j_int_arr(const int* a, int n) {
+    printf("RESULT\t[");
+    for (int i = 0; i < n; ++i) { if (i) printf(","); printf("%d", a[i]); }
+    printf("]\n");
+}
+static void __j_char_arr(char** a, int n) {
+    printf("RESULT\t[");
+    for (int i = 0; i < n; ++i) {
+        if (i) printf(",");
+        if (!a[i]) printf("null");
+        else printf("\"%s\"", a[i]);
+    }
+    printf("]\n");
+}
+static int __parse_ints(const char* s, int* out, int* isnull, int cap) {
+    int n = 0;
+    const char* p = s;
+    while (*p && *p != '[') p++;
+    if (*p == '[') p++;
+    while (*p && n < cap) {
+        while (*p == ' ' || *p == '\t' || *p == '\n' || *p == '\r' || *p == ',') p++;
+        if (*p == ']') break;
+        if (*p == 'n') {
+            if (isnull) isnull[n] = 1;
+            if (out) out[n] = 0;
+            p += 4;
+        } else {
+            char* end;
+            long v = strtol(p, &end, 10);
+            if (end == p) break;
+            p = end;
+            if (isnull) isnull[n] = 0;
+            if (out) out[n] = (int)v;
+        }
+        n++;
+    }
+    return n;
+}
+static int __split_strs(const char* s, char** out, int cap) {
+    int n = 0;
+    const char* p = s;
+    while (*p && *p != '[') p++;
+    if (*p == '[') p++;
+    while (*p && n < cap) {
+        while (*p == ' ' || *p == '\t' || *p == '\n' || *p == '\r' || *p == ',') p++;
+        if (*p == ']') break;
+        if (*p == '"') {
+            p++;
+            char buf[512];
+            size_t bl = 0;
+            while (*p && *p != '"' && bl < sizeof(buf) - 1) {
+                if (*p == '\\' && p[1]) {
+                    char c = p[1];
+                    if (c == 'n') buf[bl++] = '\n';
+                    else if (c == 't') buf[bl++] = '\t';
+                    else if (c == 'r') buf[bl++] = '\r';
+                    else if (c == '\\') buf[bl++] = '\\';
+                    else if (c == '"') buf[bl++] = '"';
+                    else buf[bl++] = c;
+                    p += 2;
+                } else {
+                    buf[bl++] = *p++;
+                }
+            }
+            buf[bl] = 0;
+            if (*p == '"') p++;
+            if (out) {
+                char* s2 = (char*)malloc(bl + 1);
+                if (s2) { memcpy(s2, buf, bl + 1); out[n] = s2; }
+            }
+            n++;
+        } else if (*p == 'n') {
+            if (out) out[n] = NULL;
+            n++;
+            p += 4;
+        } else {
+            break;
+        }
+    }
+    return n;
+}
+`
+
+const cListNodeSrc = `
+static struct ListNode* __mk_list(const char* json) {
+    int vals[8192];
+    int n = __parse_ints(json, vals, NULL, 8192);
+    struct ListNode* head = NULL;
+    struct ListNode* cur = NULL;
+    for (int i = 0; i < n; ++i) {
+        struct ListNode* node = (struct ListNode*)malloc(sizeof(struct ListNode));
+        node->val = vals[i];
+        node->next = NULL;
+        if (!head) head = node; else cur->next = node;
+        cur = node;
+    }
+    return head;
+}
+static void __j_listnode(const struct ListNode* h) {
+    printf("RESULT\t[");
+    const struct ListNode* p = h;
+    int i = 0;
+    while (p) { if (i++) printf(","); printf("%d", p->val); p = p->next; }
+    printf("]\n");
+}
+`
+
+const cTreeNodeSrc = `
+static struct TreeNode* __mk_tree(const char* json) {
+    int vals[8192];
+    int isnull[8192];
+    int n = __parse_ints(json, vals, isnull, 8192);
+    if (n == 0) return NULL;
+    struct TreeNode* q[8192];
+    struct TreeNode* root = (struct TreeNode*)malloc(sizeof(struct TreeNode));
+    root->val = vals[0]; root->left = NULL; root->right = NULL;
+    int head = 0, tail = 0;
+    q[tail++] = root;
+    int idx = 1;
+    while (head < tail && idx < n) {
+        struct TreeNode* node = q[head++];
+        if (!isnull[idx]) {
+            struct TreeNode* l = (struct TreeNode*)malloc(sizeof(struct TreeNode));
+            l->val = vals[idx]; l->left = NULL; l->right = NULL;
+            node->left = l; q[tail++] = l;
+        }
+        idx++;
+        if (idx < n && !isnull[idx]) {
+            struct TreeNode* r = (struct TreeNode*)malloc(sizeof(struct TreeNode));
+            r->val = vals[idx]; r->left = NULL; r->right = NULL;
+            node->right = r; q[tail++] = r;
+        }
+        idx++;
+    }
+    return root;
+}
+static void __j_treenode(const struct TreeNode* root) {
+    char out[32768];
+    int len = 0;
+    if (!root) { printf("RESULT\t[]\n"); return; }
+    len += snprintf(out + len, sizeof(out) - len, "[%d", root->val);
+    const struct TreeNode* q[8192];
+    int head = 0, tail = 0;
+    q[tail++] = root;
+    while (head < tail) {
+        const struct TreeNode* node = q[head++];
+        if (node->left) { q[tail++] = node->left; len += snprintf(out + len, sizeof(out) - len, ",%d", node->left->val); }
+        else len += snprintf(out + len, sizeof(out) - len, ",null");
+        if (node->right) { q[tail++] = node->right; len += snprintf(out + len, sizeof(out) - len, ",%d", node->right->val); }
+        else len += snprintf(out + len, sizeof(out) - len, ",null");
+    }
+    while (len >= 5 && strncmp(out + len - 5, ",null", 5) == 0) len -= 5;
+    len += snprintf(out + len, sizeof(out) - len, "]");
+    printf("RESULT\t%s\n", out);
 }
 `
 

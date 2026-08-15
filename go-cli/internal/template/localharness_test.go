@@ -185,3 +185,102 @@ func TestGoTypeFor(t *testing.T) {
 		}
 	}
 }
+
+func TestExtractMethodSignatureC(t *testing.T) {
+	code := `/**
+ * Return an array of size *returnSize.
+ * Note: The returned array must be malloced, assume caller calls free().
+ */
+int* twoSum(int* nums, int numsSize, int target, int* returnSize) {
+    return NULL;
+}
+
+int helper(int x) { return x; }
+`
+	sig, ok := ExtractMethodSignature("c", code)
+	if !ok {
+		t.Fatal("expected signature")
+	}
+	if sig.Name != "twoSum" {
+		t.Fatalf("got name %s", sig.Name)
+	}
+	if len(sig.Params) != 4 {
+		t.Fatalf("params: %+v", sig.Params)
+	}
+	if sig.Params[0].Type != "int*" || sig.Params[3].Type != "int*" {
+		t.Fatalf("param types: %+v", sig.Params)
+	}
+}
+
+func TestBuildCHarness(t *testing.T) {
+	code := `int* twoSum(int* nums, int numsSize, int target, int* returnSize) {
+    for (int i = 0; i < numsSize; ++i) {
+        for (int j = i + 1; j < numsSize; ++j) {
+            if (nums[i] + nums[j] == target) {
+                int* res = (int*)malloc(2 * sizeof(int));
+                res[0] = i;
+                res[1] = j;
+                *returnSize = 2;
+                return res;
+            }
+        }
+    }
+    *returnSize = 0;
+    return NULL;
+}
+`
+	sig := MethodSig{
+		Name:       "twoSum",
+		Params:     []Param{{Name: "nums", Type: "int*"}, {Name: "numsSize", Type: "int"}, {Name: "target", Type: "int"}, {Name: "returnSize", Type: "int*"}},
+		ReturnType: "int*",
+	}
+	cases := []TestCase{
+		{Args: []string{"[2,7,11,15]", "9"}, Expected: "[0,1]"},
+		{Args: []string{"[3,2,4]", "6"}, Expected: "[1,2]"},
+		{Args: []string{"[3,3]", "6"}, Expected: "[0,1]"},
+	}
+	h, ok := BuildLocalHarness("c", code, sig, cases)
+	if !ok {
+		t.Fatal("harness build failed")
+	}
+	if !strings.Contains(h, "int* twoSum(") {
+		t.Fatalf("solution code missing from harness:\n%s", h)
+	}
+	if !strings.Contains(h, "__j_int_arr(__r, __o3);") {
+		t.Fatalf("array printer call missing:\n%s", h)
+	}
+	if strings.Contains(h, "class Solution") {
+		t.Fatalf("C harness must not reference class Solution:\n%s", h)
+	}
+}
+
+func TestBuildGoHarnessAddsImports(t *testing.T) {
+	code := `package main
+
+import "fmt"
+
+func twoSum(nums []int, target int) []int {
+	fmt.Println("debug")
+	return nil
+}`
+	sig := MethodSig{
+		Name:       "twoSum",
+		Params:     []Param{{Name: "nums", Type: "[]int"}, {Name: "target", Type: "int"}},
+		ReturnType: "[]int",
+	}
+	h, ok := BuildLocalHarness("go", code, sig, nil)
+	if !ok {
+		t.Fatal("harness build failed")
+	}
+	for _, imp := range []string{`"encoding/json"`, `"fmt"`, `"io"`, `"os"`} {
+		if !strings.Contains(h, imp) {
+			t.Errorf("missing import %s in harness:\n%s", imp, h)
+		}
+	}
+	if strings.Count(h, `"fmt"`) != 1 {
+		t.Errorf("fmt imported more than once:\n%s", h)
+	}
+	if !strings.Contains(h, "func leetMain()") || !strings.Contains(h, "func main()") {
+		t.Fatalf("harness missing main functions:\n%s", h)
+	}
+}
