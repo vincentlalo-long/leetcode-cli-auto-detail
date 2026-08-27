@@ -209,14 +209,36 @@ var CommandDocs = map[string]CommandDoc{
 		Description: "Saves current configuration and cleanly exits the application.",
 		Examples:    []string{"exit", "quit"},
 	},
+	"doctor": {
+		Name:        "doctor",
+		Summary:     "Validate workspace config and directory structure",
+		Usage:       "doctor",
+		Description: "Checks base_dir, config, data structures, cookies, file structure, orphan files, missing READMEs, and suspicious filenames. Reports fixable issues.",
+		Examples:    []string{"doctor"},
+	},
+	"verify": {
+		Name:        "verify",
+		Summary:     "Auto-test a solution file without interactive prompts",
+		Usage:       "verify <file_path> [--local]",
+		Description: "Infers problem number from the filename, fetches example test cases (local README or LeetCode API), builds a harness, and runs it. Exits non-zero on failure. Ideal for CI/CD pipelines.",
+		Examples:    []string{"verify solutions/array/1_two_sum.cpp --local", "verify main.go"},
+	},
+	"completion": {
+		Name:        "completion",
+		Summary:     "Generate shell completion scripts",
+		Usage:       "completion [bash|zsh|fish]",
+		Description: "Prints tab-completion scripts for bash, zsh, or fish. Add the output to your shell's completion config to enable command and flag completion.",
+		Examples:    []string{"completion bash", "completion zsh", "completion fish"},
+	},
 }
 
 // CommandOrder is the canonical order used when listing commands in help.
 var CommandOrder = []string{
 	"add", "add-sol", "list", "search", "manage-structures",
 	"stats", "theme", "daily", "random", "hint", "similar",
-	"open", "web", "run", "test", "submit", "timer", "note", "review",
-	"sync", "clean", "readme", "profile", "contest", "config", "clear", "exit",
+	"open", "web", "run", "test", "submit", "verify", "timer", "note", "review",
+	"sync", "clean", "readme", "doctor", "profile", "contest", "config",
+	"completion", "clear", "exit",
 }
 
 // HelpCommand is the handler for help/man/--help/-h. With no arguments it
