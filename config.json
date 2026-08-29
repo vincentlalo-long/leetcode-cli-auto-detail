@@ -28,14 +28,7 @@
     "graph": "graph",
     "tree": "tree",
     "heap": "heap",
-    "hash": "hash",
-    "dp": "dp",
-    "binary": "binary",
-    "two-pointer": "two_pointers",
-    "sliding": "sliding_window",
-    "backtracking": "backtracking",
-    "greedy": "greedy",
-    "math": "math"
+    "hash": "hash"
   },
   "theme": "default",
   "editor": "code"
