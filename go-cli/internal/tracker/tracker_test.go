@@ -13,7 +13,7 @@ func TestUpsertAndStatus(t *testing.T) {
 		t.Fatalf("new tracker should have no problems")
 	}
 
-	p.Upsert(baseDir, "1", "Two Sum", "two-sum", "Easy", "array", "solved", "8 ms", "10 MB")
+	p.Upsert(baseDir, "1", "Two Sum", "two-sum", "Easy", "array", []string{"Array", "Hash Table"}, "solved", "8 ms", "10 MB")
 	if err := p.Save(baseDir); err != nil {
 		t.Fatalf("Save failed: %v", err)
 	}
@@ -43,9 +43,9 @@ func TestUpsertAndStatus(t *testing.T) {
 func TestUpsertTracksBestRuntime(t *testing.T) {
 	p := Load(t.TempDir())
 
-	p.Upsert("", "1", "Two Sum", "two-sum", "Easy", "array", "solved", "12 ms", "12 MB")
-	p.Upsert("", "1", "Two Sum", "two-sum", "Easy", "array", "solved", "5 ms", "8 MB")
-	p.Upsert("", "1", "Two Sum", "two-sum", "Easy", "array", "unsolved", "20 ms", "20 MB")
+	p.Upsert("", "1", "Two Sum", "two-sum", "Easy", "array", []string{"Array", "Hash Table"}, "solved", "12 ms", "12 MB")
+	p.Upsert("", "1", "Two Sum", "two-sum", "Easy", "array", []string{"Array", "Hash Table"}, "solved", "5 ms", "8 MB")
+	p.Upsert("", "1", "Two Sum", "two-sum", "Easy", "array", []string{"Array", "Hash Table"}, "unsolved", "20 ms", "20 MB")
 
 	e := p.Get("1")
 	if e.BestRuntime != "5 ms" {
@@ -61,7 +61,7 @@ func TestUpsertTracksBestRuntime(t *testing.T) {
 
 func TestMarkReviewedSchedulesNext(t *testing.T) {
 	p := Load(t.TempDir())
-	p.Upsert("", "1", "Two Sum", "two-sum", "Easy", "array", "solved", "5 ms", "8 MB")
+	p.Upsert("", "1", "Two Sum", "two-sum", "Easy", "array", []string{"Array", "Hash Table"}, "solved", "5 ms", "8 MB")
 
 	if !p.MarkReviewed("1") {
 		t.Fatal("MarkReviewed(1) should succeed")
@@ -82,9 +82,9 @@ func TestDueReviews(t *testing.T) {
 	p := Load(t.TempDir())
 
 	// solved with no next_review -> due immediately
-	p.Upsert("", "1", "Two Sum", "two-sum", "Easy", "array", "solved", "5 ms", "8 MB")
+	p.Upsert("", "1", "Two Sum", "two-sum", "Easy", "array", []string{"Array", "Hash Table"}, "solved", "5 ms", "8 MB")
 	// reviewed -> scheduled in future, not due
-	p.Upsert("", "2", "Add Two", "add-two", "Medium", "string", "solved", "5 ms", "8 MB")
+	p.Upsert("", "2", "Add Two", "add-two", "Medium", "string", []string{"Array", "Linked List"}, "solved", "5 ms", "8 MB")
 	p.MarkReviewed("2")
 
 	due := p.DueReviews()

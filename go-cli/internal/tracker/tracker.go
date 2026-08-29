@@ -12,23 +12,24 @@ import (
 
 // ProgressEntry tracks the solving status and review state of one problem.
 type ProgressEntry struct {
-	Number       string `json:"number"`
-	Title        string `json:"title"`
-	Slug         string `json:"slug"`
-	Difficulty   string `json:"difficulty"`
-	Category     string `json:"category"`
-	Status       string `json:"status"` // unsolved | solved
-	SolvedDate   string `json:"solved_date,omitempty"`
-	LastAccepted string `json:"last_accepted,omitempty"`
-	LastRuntime  string `json:"last_runtime,omitempty"`
-	LastMemory   string `json:"last_memory,omitempty"`
-	BestRuntime  string `json:"best_runtime,omitempty"`
-	BestMemory   string `json:"best_memory,omitempty"`
-	Submissions  int    `json:"submissions"`
-	AcceptedCount int   `json:"accepted_count"`
-	ReviewCount  int    `json:"review_count"`
-	LastReviewed string `json:"last_reviewed,omitempty"`
-	NextReview   string `json:"next_review,omitempty"`
+	Number       string   `json:"number"`
+	Title        string   `json:"title"`
+	Slug         string   `json:"slug"`
+	Difficulty   string   `json:"difficulty"`
+	Category     string   `json:"category"`
+	Tags         []string `json:"tags,omitempty"`
+	Status       string   `json:"status"` // unsolved | solved
+	SolvedDate   string   `json:"solved_date,omitempty"`
+	LastAccepted string   `json:"last_accepted,omitempty"`
+	LastRuntime  string   `json:"last_runtime,omitempty"`
+	LastMemory   string   `json:"last_memory,omitempty"`
+	BestRuntime  string   `json:"best_runtime,omitempty"`
+	BestMemory   string   `json:"best_memory,omitempty"`
+	Submissions  int      `json:"submissions"`
+	AcceptedCount int     `json:"accepted_count"`
+	ReviewCount  int      `json:"review_count"`
+	LastReviewed string   `json:"last_reviewed,omitempty"`
+	NextReview   string   `json:"next_review,omitempty"`
 }
 
 // Progress is the on-disk state, stored in <base_dir>/.leet/progress.json.
@@ -75,7 +76,7 @@ func (p *Progress) Get(number string) *ProgressEntry {
 }
 
 // Upsert records or updates a problem entry from a submission result.
-func (p *Progress) Upsert(baseDir, number, title, slug, difficulty, category, status, runtime, memory string) {
+func (p *Progress) Upsert(baseDir, number, title, slug, difficulty, category string, tags []string, status, runtime, memory string) {
 	e := p.Problems[number]
 	if e == nil {
 		e = &ProgressEntry{Number: number}
@@ -86,6 +87,9 @@ func (p *Progress) Upsert(baseDir, number, title, slug, difficulty, category, st
 	e.Slug = slug
 	e.Difficulty = difficulty
 	e.Category = category
+	if len(tags) > 0 {
+		e.Tags = tags
+	}
 	e.Submissions++
 	if status == "solved" {
 		e.Status = "solved"
@@ -132,7 +136,7 @@ func numericLess(a, b string) bool {
 }
 
 // SetStatus manually marks a problem solved/unsolved (e.g. review --solve / --unsolve).
-func (p *Progress) SetStatus(number, title, difficulty string, solved bool) {
+func (p *Progress) SetStatus(number, title, difficulty string, tags []string, solved bool) {
 	e := p.Problems[number]
 	if e == nil {
 		e = &ProgressEntry{Number: number}
@@ -140,6 +144,9 @@ func (p *Progress) SetStatus(number, title, difficulty string, solved bool) {
 	}
 	e.Title = title
 	e.Difficulty = difficulty
+	if len(tags) > 0 {
+		e.Tags = tags
+	}
 	if solved {
 		e.Status = "solved"
 		if e.SolvedDate == "" {

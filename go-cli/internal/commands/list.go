@@ -18,6 +18,7 @@ type ProblemRecord struct {
 	Structure  string
 	Solutions  int
 	Difficulty string
+	Tags       []string
 }
 
 func ListProblems(args []string, cfg *config.Config, ui UI) error {
@@ -52,11 +53,12 @@ func ListProblems(args []string, cfg *config.Config, ui UI) error {
 		return nil
 	}
 
-	// Non-interactive flags: leet list --ds array --difficulty Easy --unsolved
+	// Non-interactive flags: leet list --ds array --difficulty Easy --unsolved --tag "Hash Table"
 	filterFlagged := false
 	selectedStructure := ""
 	difficulty := ""
 	unsolvedOnly := false
+	tagFilter := ""
 	if hasFlag(flags, "ds") {
 		filterFlagged = true
 		selectedStructure = flags["ds"]
@@ -75,6 +77,10 @@ func ListProblems(args []string, cfg *config.Config, ui UI) error {
 	if hasFlag(flags, "unsolved") || hasFlag(flags, "u") {
 		filterFlagged = true
 		unsolvedOnly = true
+	}
+	if hasFlag(flags, "tag") {
+		filterFlagged = true
+		tagFilter = flags["tag"]
 	}
 
 	if !filterFlagged && len(pos) == 0 {
@@ -105,7 +111,7 @@ func ListProblems(args []string, cfg *config.Config, ui UI) error {
 		selectedStructure = ""
 	}
 
-	filtered := filterProblems(records, selectedStructure, difficulty, unsolvedOnly)
+	filtered := filterProblems(records, selectedStructure, difficulty, unsolvedOnly, tagFilter)
 
 	ui.WriteOutput(MsgPlain, "Overview")
 	ui.WriteOutput(MsgInfo, "Total problems: %d", len(records))
@@ -115,6 +121,9 @@ func ListProblems(args []string, cfg *config.Config, ui UI) error {
 	}
 	if difficulty != "" {
 		ui.WriteOutput(MsgInfo, "Difficulty: %s", difficulty)
+	}
+	if tagFilter != "" {
+		ui.WriteOutput(MsgInfo, "Tag: %s", tagFilter)
 	}
 	if unsolvedOnly {
 		ui.WriteOutput(MsgInfo, "Mode: Unsolved only")
@@ -137,7 +146,11 @@ func ListProblems(args []string, cfg *config.Config, ui UI) error {
 		if diff == "" {
 			diff = "?"
 		}
-		ui.WriteOutput(MsgPlain, "  %d. %s (%s, %s, %s)", i+1, r.FileName, r.Structure, diff, status)
+		tagsStr := ""
+		if len(r.Tags) > 0 {
+			tagsStr = fmt.Sprintf(" [%s]", strings.Join(r.Tags, ", "))
+		}
+		ui.WriteOutput(MsgPlain, "  %d. %s (%s, %s, %s)%s", i+1, r.FileName, r.Structure, diff, status, tagsStr)
 		ui.WriteOutput(MsgPlain, "     %s", r.FilePath)
 	}
 	return nil
@@ -168,6 +181,7 @@ func collectProblems(baseDir string, dataStructures map[string]string, exts []st
 			Structure:  template.DetectStructure(f, dataStructures),
 			Solutions:  solutions,
 			Difficulty: readDifficultyFromReadme(filepath.Dir(f)),
+			Tags:       readTagsFromReadme(filepath.Dir(f)),
 		})
 	}
 
@@ -205,7 +219,32 @@ func readDifficultyFromReadme(dir string) string {
 	return ""
 }
 
-func filterProblems(records []ProblemRecord, selectedStructure, difficulty string, unsolvedOnly bool) []ProblemRecord {
+func readTagsFromReadme(dir string) []string {
+	data, err := os.ReadFile(filepath.Join(dir, "README.md"))
+	if err != nil {
+		return nil
+	}
+	re := regexp.MustCompile(`(?i)-\s*\*\*Tags:\*\*\s*(.+)`)
+	m := re.FindStringSubmatch(string(data))
+	if len(m) < 2 {
+		return nil
+	}
+	raw := strings.TrimSpace(m[1])
+	if raw == "" || raw == "None" {
+		return nil
+	}
+	parts := strings.Split(raw, ",")
+	var tags []string
+	for _, p := range parts {
+		t := strings.TrimSpace(p)
+		if t != "" {
+			tags = append(tags, t)
+		}
+	}
+	return tags
+}
+
+func filterProblems(records []ProblemRecord, selectedStructure, difficulty string, unsolvedOnly bool, tagFilter string) []ProblemRecord {
 	var filtered []ProblemRecord
 	for _, r := range records {
 		if selectedStructure != "" && r.Structure != selectedStructure {
@@ -217,7 +256,20 @@ func filterProblems(records []ProblemRecord, selectedStructure, difficulty strin
 		if unsolvedOnly && r.Solutions > 0 {
 			continue
 		}
+		if tagFilter != "" && !hasTag(r.Tags, tagFilter) {
+			continue
+		}
 		filtered = append(filtered, r)
 	}
 	return filtered
+}
+
+func hasTag(tags []string, filter string) bool {
+	filterLower := strings.ToLower(filter)
+	for _, t := range tags {
+		if strings.ToLower(t) == filterLower {
+			return true
+		}
+	}
+	return false
 }

@@ -52,7 +52,7 @@ func ReviewQueue(args []string, cfg *config.Config, ui UI) error {
 			return fmt.Errorf("specify a problem number: review --solve 1")
 		}
 		title, difficulty := lookupProblemInfo(baseDir, num)
-		prog.SetStatus(num, title, difficulty, solved)
+		prog.SetStatus(num, title, difficulty, nil, solved)
 		if err := prog.Save(baseDir); err != nil {
 			ui.WriteOutput(MsgError, "Failed to save progress: %v", err)
 			return fmt.Errorf("failed to save progress: %w", err)

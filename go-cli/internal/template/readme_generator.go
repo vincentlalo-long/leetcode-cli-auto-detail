@@ -20,6 +20,7 @@ type ProblemEntry struct {
 	Link         string
 	Difficulty   string
 	Category     string
+	Tags         []string
 	DirRelPath   string
 	ReadmeRel    string
 	SolutionRels []string
@@ -144,6 +145,7 @@ func GenerateRootReadme(baseDir string, cfg *config.Config) (string, int, error)
 
 var titleRe = regexp.MustCompile(`(?m)^#\s*\[(\d+)\.\s*([^\]]+)\](?:\(([^)]+)\))?`)
 var diffRe = regexp.MustCompile(`(?i)-\s*\*\*Difficulty:\*\*\s*(.+)`)
+var tagsRe = regexp.MustCompile(`(?i)-\s*\*\*Tags:\*\*\s*(.+)`)
 
 func parseProblemFolder(baseDir, dirPath string, dsMap map[string]string) *ProblemEntry {
 	entry := &ProblemEntry{
@@ -175,6 +177,19 @@ func parseProblemFolder(baseDir, dirPath string, dsMap map[string]string) *Probl
 		mDiff := diffRe.FindStringSubmatch(text)
 		if len(mDiff) >= 2 {
 			entry.Difficulty = strings.TrimSpace(mDiff[1])
+		}
+
+		mTags := tagsRe.FindStringSubmatch(text)
+		if len(mTags) >= 2 {
+			raw := strings.TrimSpace(mTags[1])
+			if raw != "" && raw != "None" {
+				for _, t := range strings.Split(raw, ",") {
+					t = strings.TrimSpace(t)
+					if t != "" {
+						entry.Tags = append(entry.Tags, t)
+					}
+				}
+			}
 		}
 	}
 
@@ -271,8 +286,8 @@ func buildReadmeMarkdown(entries []*ProblemEntry) string {
 
 	sb.WriteString("---\n\n")
 	sb.WriteString("## 📚 Problem List\n\n")
-	sb.WriteString("| # | Problem Title | Category | Difficulty | Solution File | Details & Notes |\n")
-	sb.WriteString("|---|---------------|----------|------------|---------------|-----------------|\n")
+	sb.WriteString("| # | Problem Title | Category | Difficulty | Tags | Solution File | Details & Notes |\n")
+	sb.WriteString("|---|---------------|----------|------------|------|---------------|-----------------|\n")
 
 	for _, e := range entries {
 		numDisplay := e.NumStr
@@ -309,8 +324,13 @@ func buildReadmeMarkdown(entries []*ProblemEntry) string {
 			readmeCell = fmt.Sprintf("[`README.md`](%s)", target)
 		}
 
-		sb.WriteString(fmt.Sprintf("| %s | %s | %s | %s | %s | %s |\n",
-			numDisplay, titleCell, catCell, diffCell, solCell, readmeCell))
+		tagsCell := "-"
+		if len(e.Tags) > 0 {
+			tagsCell = strings.Join(e.Tags, ", ")
+		}
+
+		sb.WriteString(fmt.Sprintf("| %s | %s | %s | %s | %s | %s | %s |\n",
+			numDisplay, titleCell, catCell, diffCell, tagsCell, solCell, readmeCell))
 	}
 
 	sb.WriteString("\n---\n*Automated index created with ❤️ using `leet sync` or `leet readme`.*\n")

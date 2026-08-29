@@ -201,6 +201,10 @@ func recordLocalPass(cfg *config.Config, ui UI, targetFile, content string) {
 	title := details.Title
 	difficulty := details.Difficulty
 	category := template.DetectStructure(targetFile, cfg.GetDataStructures())
+	tags := make([]string, len(details.TopicTags))
+	for i, t := range details.TopicTags {
+		tags[i] = t.Name
+	}
 
 	base := filepath.Base(targetFile)
 	re := regexp.MustCompile(`^(\d+)`)
@@ -211,7 +215,7 @@ func recordLocalPass(cfg *config.Config, ui UI, targetFile, content string) {
 		number = api.Slugify(title)
 	}
 
-	prog.Upsert(cfg.BaseDir, number, title, slug, difficulty, category, "solved", "", "")
+	prog.Upsert(cfg.BaseDir, number, title, slug, difficulty, category, tags, "solved", "", "")
 	if err := prog.Save(cfg.BaseDir); err != nil {
 		ui.WriteOutput(MsgError, "Warning: could not save progress: %v", err)
 		return
@@ -229,6 +233,10 @@ func recordSubmission(cfg *config.Config, targetFile, slug string, details *api.
 	title := details.Title
 	difficulty := details.Difficulty
 	category := template.DetectStructure(targetFile, cfg.GetDataStructures())
+	tags := make([]string, len(details.TopicTags))
+	for i, t := range details.TopicTags {
+		tags[i] = t.Name
+	}
 
 	base := filepath.Base(targetFile)
 	re := regexp.MustCompile(`^(\d+)`)
@@ -243,7 +251,7 @@ func recordSubmission(cfg *config.Config, targetFile, slug string, details *api.
 	if accepted {
 		status = "solved"
 	}
-	prog.Upsert(cfg.BaseDir, number, title, slug, difficulty, category, status, runtime, memory)
+	prog.Upsert(cfg.BaseDir, number, title, slug, difficulty, category, tags, status, runtime, memory)
 	if err := prog.Save(cfg.BaseDir); err != nil {
 		ui.WriteOutput(MsgError, "Warning: could not save progress: %v", err)
 		return
